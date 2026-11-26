@@ -1,0 +1,59 @@
+name: Build and deploy
+
+# Builds on every push and pull request. Pushes to master also publish the
+# build to the gh-pages branch, which GitHub Pages serves.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Modern Node installs the packages and runs the formatter tests.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # The 2015 build tools themselves only run on old Node.
+      - name: Install Node 4 for the build
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSLO https://nodejs.org/dist/v4.9.1/node-v4.9.1-linux-x64.tar.xz
+          echo "db65d409f0fd7e4ff817509c7ec29df72f4b3f6885297b98f64781ecea92feea  node-v4.9.1-linux-x64.tar.xz" | sha256sum -c -
+          tar -xJf node-v4.9.1-linux-x64.tar.xz
+          echo "NODE4=$RUNNER_TEMP/node-v4.9.1-linux-x64/bin/node" >> "$GITHUB_ENV"
+
+      - name: Test the output formatters
+        run: npm run test:formats
+
+      - name: Build
+        run: bash scripts/build-legacy.sh production
+
+      - name: Deploy to gh-pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        run: |
+          git fetch --depth=1 origin gh-pages
+          git worktree add --detach site FETCH_HEAD
+          cd site
+          git ls-files | grep -vE '^(\.gitignore|README\.md)$' | xargs -r git rm -q
+          cp -R ../dist/. .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing changed; skipping deploy."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Deploy ${GITHUB_SHA::7}"
+          git push origin HEAD:refs/heads/gh-pages
