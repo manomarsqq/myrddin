@@ -1,5 +1,18 @@
 # Myrddin Changelog
 
+### Myrddin 0.3.0
+- New per-interlude **Output Format** setting: Classic PHO, Forum BBCode, AO3 Forum.
+- Forum BBCode: XenForo 2 (SpaceBattles / SV / QQ) BBCode laid out as a forum
+  thread, with table-based posts, avatars, user banners, post numbers, page
+  navigation, and Sidebar or Stacked layout.
+- AO3 Forum: chapter HTML plus a generated work skin (Midnight, Graphite, Ember
+  and Daylight themes) that renders the interlude as a XenForo-style forum on
+  AO3. It wraps to a mobile layout without media queries.
+- BBCode in post bodies is rendered in the Forum and AO3 previews and in the
+  AO3 output.
+- Configurable forum name. Copy buttons for the output.
+- Node unit tests for the formatters (`npm run test:formats`).
+
 ### Mryddin 0.2.0
 - Move the Output/Preview selector into the nav bar, so that they are more accessible.
 - Add a select all button in the navbar to select everything in the output.

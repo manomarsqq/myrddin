@@ -1,4 +1,7 @@
-{{#preview-panel class="preview-panel preview-panel-fixed-right col-xs-12 col-sm-7 col-md-6 col-lg-5" showPanel=model.settings.showPanel showOutput=model.settings.showOutput selectOutput='selectOutput' selectPreview='selectPreview'}}
+{{#preview-panel class="preview-panel preview-panel-fixed-right col-xs-12 col-sm-7 col-md-6 col-lg-5" showPanel=model.settings.showPanel showOutput=model.settings.showOutput format=model.outputFormat selectOutput='selectOutput' selectPreview='selectPreview'}}
+  {{#unless model.isClassicFormat}}
+    {{interlude-output doc=model showOutput=model.settings.showOutput}}
+  {{else}}
   <div id="interludeTextContent">
     {{#if model.settings.showOutput}}
       <p>[CENTER]■[/CENTER]</p>
@@ -130,6 +133,7 @@
 
     {{/each}}
   </div>
+  {{/unless}}
 {{/preview-panel}}
 
 <div class="container container-left">
@@ -182,6 +186,38 @@
               param=model.id}}
 
             {{/select-post-per-page }}
+          </li>
+          <li class="list-group-item">
+            <label>Output Format</label>
+            <div class="btn-group btn-group-justified" role="group" aria-label="Output format">
+              <a class="btn btn-default btn-sm {{if model.isClassicFormat 'active'}}" title="The original PHO-style BBCode." {{action "setDocOption" model "outputFormat" "classic"}}>Classic PHO</a>
+              <a class="btn btn-default btn-sm {{if (eq-str model.outputFormat 'forum') 'active'}}" title="XenForo BBCode laid out like forum posts, for SpaceBattles, Sufficient Velocity and Questionable Questing." {{action "setDocOption" model "outputFormat" "forum"}}>Forum BBCode</a>
+              <a class="btn btn-default btn-sm {{if (eq-str model.outputFormat 'ao3') 'active'}}" title="HTML plus a work skin that makes the chapter look like a forum on AO3." {{action "setDocOption" model "outputFormat" "ao3"}}>AO3 Forum</a>
+            </div>
+            {{#unless model.isClassicFormat}}
+              <div class="output-options">
+                <label for="interlude-forum-name">Forum Name</label>
+                {{input id="interlude-forum-name" class="form-control input-sm" value=model.forumName placeholder="Parahumans Online" focus-out="saveDoc"}}
+
+                <label>Theme</label>
+                <div class="btn-group btn-group-justified" role="group" aria-label="Theme">
+                  {{#each forumThemes as |theme|}}
+                    <a class="btn btn-default btn-sm {{if (eq-str model.forumTheme theme.key) 'active'}}" title={{theme.label}} {{action "setDocOption" model "forumTheme" theme.key}}>
+                      <span class="theme-swatch" style={{theme.swatch}}></span> {{theme.name}}
+                    </a>
+                  {{/each}}
+                </div>
+                {{#if (eq-str model.outputFormat 'forum')}}
+                  <span class="help-block">Forum BBCode can't set the forum's own colours. The theme only changes the preview, so pick the one closest to the board you post on.</span>
+
+                  <label>Post Layout</label>
+                  <div class="btn-group btn-group-justified" role="group" aria-label="Post layout">
+                    <a class="btn btn-default btn-sm {{if (eq-str model.bbLayout 'stacked') '' 'active'}}" title="User info in a column on the left, like the desktop forum." {{action "setDocOption" model "bbLayout" "sidebar"}}>Sidebar</a>
+                    <a class="btn btn-default btn-sm {{if (eq-str model.bbLayout 'stacked') 'active'}}" title="User info in a header row above the post. Reads better on phones." {{action "setDocOption" model "bbLayout" "stacked"}}>Stacked</a>
+                  </div>
+                {{/if}}
+              </div>
+            {{/unless}}
           </li>
         </ul>
       </div>

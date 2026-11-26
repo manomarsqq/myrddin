@@ -1,0 +1,54 @@
+{{#if showOutput}}
+  {{#if isAo3}}
+    <div class="output-step">
+      <div class="output-step-head">
+        <button type="button" class="btn btn-preview btn-xs pull-right" {{action 'copyText' 'interludeWorkSkin'}}>
+          {{fa-icon "clipboard"}} {{if copiedSkin "Copied!" "Copy"}}
+        </button>
+        <b>Step 1: Work skin</b>
+        <div class="output-step-help">
+          On AO3, go to Dashboard &rsaquo; Skins &rsaquo; My Work Skins &rsaquo; Create Work Skin and paste this as the CSS.
+          You only need to do this once per theme. Then, under Associations on the work's edit page, choose that skin as the Work Skin.
+        </div>
+      </div>
+      <pre id="interludeWorkSkin" class="output-code output-code-short">{{workSkin}}</pre>
+    </div>
+    <div class="output-step">
+      <div class="output-step-head">
+        <button type="button" class="btn btn-preview btn-xs pull-right" {{action 'copyText' 'interludeTextContent'}}>
+          {{fa-icon "clipboard"}} {{if copiedText "Copied!" "Copy"}}
+        </button>
+        <b>Step 2: Chapter text</b>
+        <div class="output-step-help">
+          Switch the chapter text box to <b>HTML</b> (not Rich Text) and paste this in.
+        </div>
+      </div>
+      <pre id="interludeTextContent" class="output-code">{{outputText}}</pre>
+    </div>
+  {{else}}
+    <div class="output-step">
+      <div class="output-step-head">
+        <button type="button" class="btn btn-preview btn-xs pull-right" {{action 'copyText' 'interludeTextContent'}}>
+          {{fa-icon "clipboard"}} {{if copiedText "Copied!" "Copy"}}
+        </button>
+        <b>Forum BBCode</b>
+        <div class="output-step-help">
+          For SpaceBattles, Sufficient Velocity and Questionable Questing (XenForo 2).
+          Switch the post editor to BB code mode first (the <b>[ ]</b> button), then paste.
+        </div>
+      </div>
+      <pre id="interludeTextContent" class="output-code">{{outputText}}</pre>
+    </div>
+  {{/if}}
+{{else}}
+  {{#if isAo3}}
+    <div class="ao3-preview">
+      <div id="workskin">
+        <div class="userstuff">{{previewHtml}}</div>
+      </div>
+    </div>
+  {{else}}
+    <div class="xf-preview {{themeClass}}">{{previewHtml}}</div>
+  {{/if}}
+{{/if}}
+{{yield}}

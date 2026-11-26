@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import { THEMES } from '../../utils/forum-format';
 
 export default Ember.Route.extend({
   settings: Ember.inject.service(),
@@ -43,6 +44,15 @@ export default Ember.Route.extend({
     });
 
     model.set('settings', Ember.inject.service('settings'));
+    controller.set('forumThemes', Object.keys(THEMES).map(function(key) {
+      var theme = THEMES[key];
+      return {
+        key: key,
+        name: key.charAt(0).toUpperCase() + key.substring(1),
+        label: theme.label,
+        swatch: Ember.String.htmlSafe('background-color: ' + theme.block + '; border-color: ' + theme.accent + ';')
+      };
+    }));
     controller.set('model', model);
   },
 
@@ -57,6 +67,15 @@ export default Ember.Route.extend({
     deleteDoc: function() {
 
       return true;
+    },
+
+    setDocOption: function(doc, key, value) {
+      doc.set(key, value);
+      doc.save();
+    },
+
+    saveDoc: function() {
+      this.get('currentModel').save();
     },
 
     renameDoc: function(id) {

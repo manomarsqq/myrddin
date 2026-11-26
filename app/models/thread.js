@@ -30,4 +30,15 @@ export default DS.Model.extend({
       }
     }
   }),
+
+  // See user.outputSignature.
+  outputSignature: Ember.computed('name', 'location', 'startPage', 'endPage',
+      'firstPost.outputSignature', 'posts.@each.outputSignature', function() {
+    var firstPost = this.get('firstPost');
+    var posts = (this.get('posts') || []).map(function(post) {
+      return post.get('outputSignature');
+    });
+    return [this.get('name'), this.get('location'), this.get('startPage'), this.get('endPage'),
+      firstPost ? firstPost.get('outputSignature') : ''].concat(posts).join('|');
+  }),
 });
