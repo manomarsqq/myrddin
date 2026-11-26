@@ -187,6 +187,12 @@ a.highlight {
   }
 }
 
+.theme-picker {
+  .btn {
+    margin: 0 4px 4px 0;
+  }
+}
+
 .theme-swatch {
   display: inline-block;
   width: 10px;
@@ -232,14 +238,8 @@ a.highlight {
 
 // ---------------------------------------------------------------------------
 // XenForo-style preview for the forum BBCode output. Approximates how
-// SpaceBattles / SV / QQ render the same BBCode.
-
-$xf-themes: (
-  midnight: (page: #161b22, block: #1d232c, border: #2f3946, text: #d6dbe1, muted: #8a95a3, accent: #6aa6e8, alt: #232b36),
-  graphite: (page: #1b1b1b, block: #242424, border: #3a3a3a, text: #dddddd, muted: #929292, accent: #e0a040, alt: #2c2c2c),
-  ember: (page: #1c1814, block: #25201b, border: #3d342b, text: #e3dace, muted: #9c8f80, accent: #de8a3a, alt: #2d2620),
-  daylight: (page: #fefefe, block: #ffffff, border: #d8dee8, text: #141414, muted: #7d8693, accent: #2577b1, alt: #f5f7fa)
-);
+// SpaceBattles / SV / QQ render the same BBCode. Colours come from the theme
+// list in utils/forum-format.js (xfPreviewCss), injected by interlude-output.
 
 .xf-preview {
   padding: 12px;
@@ -249,21 +249,34 @@ $xf-themes: (
   line-height: 1.5;
   word-wrap: break-word;
 
+  // Matches a real XenForo test post: tables fill the width, header cells
+  // are centred, and cells are vertically centred.
   .bb-table {
-    width: auto;
-    max-width: 100%;
+    width: 100%;
     margin: 4px 0 10px;
     border-collapse: collapse;
 
     td, th {
       padding: 6px 8px;
-      vertical-align: top;
+      vertical-align: middle;
       border: 1px solid;
     }
 
     th {
       font-weight: bold;
+      text-align: center;
     }
+  }
+
+  .bb-hr {
+    margin: 12px 0;
+    border: 0;
+    border-top: 1px solid;
+  }
+
+  .bb-heading-2 {
+    font-size: 22px;
+    font-weight: bold;
   }
 
   .bb-quote {
@@ -341,36 +354,6 @@ $xf-themes: (
   .bb-size-7 { font-size: 32px; line-height: 1.2; }
 }
 
-@each $name, $t in $xf-themes {
-  .xf-preview.xf-theme-#{$name} {
-    background: map-get($t, page);
-    color: map-get($t, text);
-
-    a, .bb-mention { color: map-get($t, accent); }
-
-    .bb-table {
-      background: map-get($t, block);
-
-      td, th { border-color: map-get($t, border); }
-      th { background: map-get($t, alt); }
-    }
-
-    .bb-quote, .bb-spoiler-body, .bb-code {
-      background: map-get($t, alt);
-      border-color: map-get($t, border);
-    }
-
-    .bb-quote { border-left-color: map-get($t, accent); }
-    .bb-quote-head { color: map-get($t, accent); }
-    .bb-spoiler-head { background: map-get($t, alt); color: map-get($t, text); border: 1px solid map-get($t, border); }
-    .bb-icode { background: map-get($t, alt); border-color: map-get($t, border); color: map-get($t, text); }
-    .bb-code pre { background: map-get($t, block); color: map-get($t, text); border-color: map-get($t, border); }
-    .bb-code-head { color: map-get($t, muted); }
-    .bb-ispoiler { background: map-get($t, text); color: map-get($t, text); }
-    .bb-ispoiler:hover { background: transparent; }
-  }
-}
-
 // ---------------------------------------------------------------------------
 // AO3 preview. Imitates the archive's chapter page, including the
 // `.userstuff` defaults the work skin has to override.
@@ -413,4 +396,99 @@ $xf-themes: (
   input.title-input {
     max-width: 95%;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Dark mode for the editor (toggled by dark-mode-toggle, which sets
+// body.theme-dark). Overrides Bootstrap 3's light defaults.
+
+$dk-page: #14171d;
+$dk-surface: #1c2028;
+$dk-raised: #232833;
+$dk-input: #11141a;
+$dk-border: #323946;
+$dk-text: #d8dde5;
+$dk-muted: #8b94a3;
+$dk-accent: #6aa6e8;
+
+body.theme-dark {
+  background: $dk-page;
+  color: $dk-text;
+
+  a { color: $dk-accent; }
+  hr { border-top-color: $dk-border; }
+  .text-muted, .help-block, .edit-fade { color: $dk-muted; }
+
+  .navbar-default {
+    background: $dk-surface;
+    border-color: $dk-border;
+
+    .navbar-brand { color: $dk-accent; }
+    .navbar-nav > li > a { color: $dk-text; }
+    .navbar-nav > li > a:hover,
+    .navbar-nav > .open > a,
+    .navbar-nav > .open > a:hover,
+    .navbar-nav > .open > a:focus { background: $dk-raised; color: #fff; }
+    .navbar-toggle { border-color: $dk-border; }
+    .navbar-toggle .icon-bar { background: $dk-text; }
+    .navbar-collapse { border-color: $dk-border; }
+  }
+
+  .navbar-fixed-top { box-shadow: 0 0 2px #000; }
+  .btn-noborder { color: $dk-muted; }
+  .btn-noborder:hover, .btn-noborder:focus { color: $dk-text; }
+
+  .jumbotron { background: $dk-surface; color: $dk-text; }
+
+  .panel-default {
+    background: $dk-surface;
+    border-color: $dk-border;
+    box-shadow: 0 1px 3px #000;
+
+    > .panel-heading { background: $dk-raised; border-color: $dk-border; color: $dk-text; }
+  }
+
+  .list-group-item { background: $dk-surface; border-color: $dk-border; color: $dk-text; }
+
+  .form-control {
+    background: $dk-input;
+    border-color: $dk-border;
+    color: $dk-text;
+  }
+  .form-control::-webkit-input-placeholder { color: $dk-muted; }
+  .form-control::-moz-placeholder { color: $dk-muted; }
+  .form-control:-ms-input-placeholder { color: $dk-muted; }
+
+  .input-group-addon { background: $dk-raised; border-color: $dk-border; color: $dk-text; }
+
+  .btn-default {
+    background: $dk-raised;
+    border-color: $dk-border;
+    color: $dk-text;
+  }
+  .btn-default:hover, .btn-default:focus { background: #2c3340; color: #fff; }
+  .btn-default.active, .btn-default:active { background: #36404f; border-color: #4a5566; color: #fff; }
+
+  .dropdown-menu {
+    background: $dk-surface;
+    border-color: $dk-border;
+
+    > li > a { color: $dk-text; }
+    > li > a:hover, > li > a:focus, > .active > a { background: $dk-raised; color: #fff; }
+    .divider { background: $dk-border; }
+    .dropdown-header { color: $dk-muted; }
+  }
+
+  a.highlight { background: $dk-raised; }
+  input.title-input { color: $dk-text; border-bottom-color: $dk-muted; }
+
+  // Pikaday date picker.
+  .pika-single { background: $dk-surface; border-color: $dk-border; color: $dk-text; }
+  .pika-label { background: $dk-surface; color: $dk-text; }
+  .pika-table th { color: $dk-muted; }
+  .pika-button { background: $dk-raised; color: $dk-text; }
+  .pika-button:hover { background: $dk-accent; color: #0d1117; }
+  .is-today .pika-button { color: $dk-accent; }
+  .is-selected .pika-button { background: $dk-accent; color: #0d1117; box-shadow: none; }
+  .pika-prev, .pika-next { filter: invert(1); }
 }

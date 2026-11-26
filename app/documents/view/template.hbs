@@ -200,13 +200,21 @@
                 {{input id="interlude-forum-name" class="form-control input-sm" value=model.forumName placeholder="Parahumans Online" focus-out="saveDoc"}}
 
                 <label>Theme</label>
-                <div class="btn-group btn-group-justified" role="group" aria-label="Theme">
+                <div class="theme-picker" role="group" aria-label="Theme">
                   {{#each forumThemes as |theme|}}
                     <a class="btn btn-default btn-sm {{if (eq-str model.forumTheme theme.key) 'active'}}" title={{theme.label}} {{action "setDocOption" model "forumTheme" theme.key}}>
                       <span class="theme-swatch" style={{theme.swatch}}></span> {{theme.name}}
                     </a>
                   {{/each}}
                 </div>
+
+                <label>Avatars</label>
+                <div class="btn-group btn-group-justified" role="group" aria-label="Avatars">
+                  {{#each avatarStyles as |style|}}
+                    <a class="btn btn-default btn-sm {{if (eq-str model.avatarStyle style.key) 'active'}}" title={{style.label}} {{action "setDocOption" model "avatarStyle" style.key}}>{{style.name}}</a>
+                  {{/each}}
+                </div>
+                <span class="help-block">Image avatars come from DiceBear (dicebear.com), loaded by whoever reads the post. On AO3, Initials and Text are drawn by the work skin and load nothing.</span>
                 {{#if (eq-str model.outputFormat 'forum')}}
                   <span class="help-block">Forum BBCode can't set the forum's own colours. The theme only changes the preview, so pick the one closest to the board you post on.</span>
 

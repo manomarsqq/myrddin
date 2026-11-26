@@ -13,6 +13,8 @@ export default DS.Model.extend({
   forumName: DS.attr('string', { defaultValue: 'Parahumans Online' }),
   forumTheme: DS.attr('string', { defaultValue: 'midnight' }),
   bbLayout: DS.attr('string', { defaultValue: 'sidebar' }),
+  // 'initials', 'identicon', 'thumbs' (cartoon) or 'letter' (text only).
+  avatarStyle: DS.attr('string', { defaultValue: 'initials' }),
 
   isClassicFormat: Ember.computed('outputFormat', function() {
     var format = this.get('outputFormat');

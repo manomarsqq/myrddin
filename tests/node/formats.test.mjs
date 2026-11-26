@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bbcodeToHtml, quoteAuthor } from '../../app/utils/bbcode.js';
 import {
-  forumBBCode, ao3Html, workSkinCss, threadLayout, pageList, numToWord, THEMES
+  forumBBCode, ao3Html, workSkinCss, xfPreviewCss, threadLayout, pageList, numToWord, THEMES, avatarUrl
 } from '../../app/utils/forum-format.js';
 
 var bagrat = { id: '1', name: 'Bagrat', tags: [{ id: '1', name: 'Veteran Member' }, { id: '18', name: 'Moderator' }] };
@@ -153,7 +153,8 @@ test('forum BBCode renders through our own parser into tables', function () {
   var html = bbcodeToHtml(forumBBCode(snapshot(3)), 'xf');
   // Header table + one table for page 1 (OP and 3 replies share it).
   assert.equal((html.match(/<table/g) || []).length, 2);
-  assert.equal((html.match(/<tr>/g) || []).length, 2 + 4);
+  // Each post is a header-bar row plus a content row.
+  assert.equal((html.match(/<tr>/g) || []).length, 2 + 4 * 2);
   assert.doesNotMatch(html, /\[\/?(TABLE|TR|TD|TH)\]/);
 });
 
@@ -173,7 +174,10 @@ test('forum BBCode: one table per page, OP pinned separately after page 1', func
 
 test('forum BBCode stacked layout', function () {
   var out = forumBBCode(snapshot(2), { layout: 'stacked' });
-  assert.match(out, /\[TH\]\[COLOR=#[0-9a-f]{6}\]■/);
+  assert.match(out, /\[TH\]\[LEFT\]\[IMG width="40px"\]https:\/\/api\.dicebear\.com/);
+  var letters = forumBBCode(snapshot(2), { layout: 'stacked', avatars: 'letter' });
+  assert.match(letters, /\[TH\]\[LEFT\]\[COLOR=#[0-9a-f]{6}\]■/);
+  assert.doesNotMatch(letters, /\[IMG/);
 });
 
 // --- AO3 ------------------------------------------------------------------
@@ -204,5 +208,61 @@ test('work skin CSS uses only AO3-friendly constructs', function () {
     assert.doesNotMatch(css, /@media|@import|var\(|url\(|position:|!important/);
     assert.match(css, /\.fm-post \{/);
     assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length);
+  });
+});
+
+// --- Forum BBCode polish (from a real XenForo test post) -------------------
+
+test('sidebar posts get a header bar with date and post number', function () {
+  var out = forumBBCode(snapshot(1));
+  assert.match(out, /\[TR\]\n\[TH\]\[SIZE=2\]Jan 2, 2011\[\/SIZE\]\[\/TH\]\n\[TH\]\[RIGHT\]\[SIZE=2\]#2\[\/SIZE\]\[\/RIGHT\]\[\/TH\]/);
+  assert.match(out, /\[IMG width="64px"\]https:\/\/api\.dicebear\.com\/9\.x\/initials\/png\?seed=Bagrat/);
+});
+
+test('names: plain for members, red for staff, struck grey for banned', function () {
+  var banned = { id: '9', name: 'Troll', tags: [{ id: '17', name: 'Banned' }] };
+  var snap = snapshot(1);
+  snap.threads[0].replies[0].user = banned;
+  var out = forumBBCode(snap);
+  assert.match(out, /\[B\]\[COLOR=#d64545\]Bagrat\[\/COLOR\]\[\/B\]/); // Bagrat has a Moderator tag
+  assert.match(out, /\[B\]\[COLOR=#8a8a8a\]\[S\]Troll\[\/S\]\[\/COLOR\]\[\/B\]/);
+  assert.match(out, /\[COLOR=#8c8c8c\]Veteran Member\[\/COLOR\]/);
+});
+
+test('thread titles use HEADING and threads are split with HR', function () {
+  var snap = snapshot(1);
+  snap.threads.push(Object.assign({}, snap.threads[0], { name: 'Second thread' }));
+  var out = forumBBCode(snap);
+  assert.match(out, /\[HEADING=2\]Endbringer Thread\[\/HEADING\]/);
+  assert.equal((out.match(/\[HR\]\[\/HR\]/g) || []).length, 1);
+});
+
+test('avatar URLs are stable, encoded, and use the palette for initials', function () {
+  assert.equal(avatarUrl('Bagrat', 'initials'), avatarUrl('Bagrat', 'initials'));
+  assert.match(avatarUrl('A B&C', 'thumbs'), /seed=A%20B%26C/);
+  assert.match(avatarUrl('Bagrat', 'initials'), /backgroundColor=[0-9a-f]{6}&?/);
+  assert.equal(avatarUrl('Bagrat', 'letter'), null);
+  assert.match(avatarUrl('Bagrat', 'nonsense'), /\/initials\//);
+});
+
+test('parser: IMG width attribute and [HR][/HR]', function () {
+  assert.equal(bbcodeToHtml('[IMG width="64px"]https://a.b/c.png[/IMG]', 'xf'),
+    '<img class="bb-img" src="https://a.b/c.png" alt="" style="width: 64px" />');
+  assert.doesNotMatch(bbcodeToHtml('[IMG width="64px"]https://a.b/c.png[/IMG]', 'ao3'), /style=/);
+  assert.equal(bbcodeToHtml('a[HR][/HR]b', 'xf'), 'a<hr class="bb-hr" />b');
+});
+
+test('AO3: image avatar styles use <img>, initials stay CSS', function () {
+  assert.match(ao3Html(snapshot(1), { avatars: 'thumbs' }), /<div class="fm-avatar fm-avatar-pic"><img src="https:\/\/api\.dicebear\.com\/9\.x\/thumbs\//);
+  assert.doesNotMatch(ao3Html(snapshot(1), { avatars: 'initials' }), /dicebear/);
+});
+
+test('every theme has every colour, and the preview CSS uses it', function () {
+  var keys = Object.keys(THEMES.midnight);
+  assert.ok(Object.keys(THEMES).length >= 8);
+  assert.ok(THEMES.blackgreen, 'blackened green theme exists');
+  Object.keys(THEMES).forEach(function (name) {
+    assert.deepEqual(Object.keys(THEMES[name]).sort(), keys.slice().sort(), name);
+    assert.match(xfPreviewCss(name), new RegExp('background: ' + THEMES[name].page));
   });
 });

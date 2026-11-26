@@ -1,0 +1,8 @@
+<a class="btn btn-noborder navbar-btn" title={{if dark "Switch to light mode" "Switch to dark mode"}} {{action "toggle"}}>
+  {{#if dark}}
+    {{fa-icon "sun-o" size="lg"}}
+  {{else}}
+    {{fa-icon "moon-o" size="lg"}}
+  {{/if}}
+</a>
+{{yield}}

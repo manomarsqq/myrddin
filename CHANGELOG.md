@@ -1,5 +1,17 @@
 # Myrddin Changelog
 
+### Myrddin 0.4.0
+- Forum BBCode reworked after a test post on a live XenForo forum: a shaded
+  header bar on every post, image avatars, thread titles as `[HEADING]`, a
+  rule between threads, plain usernames (red for staff, struck grey for
+  banned), muted user titles and bigger page buttons.
+- New Avatars setting: Initials, Identicon, Cartoon (DiceBear images) or Text.
+- Four new themes: Blackened Green, Ocean, Violet and Crimson. The work skin
+  and the forum preview now share one theme list.
+- The forum preview now matches XenForo: full-width tables, centred header
+  cells, vertically centred cells.
+- Dark mode for the editor, with a toggle in the navbar.
+
 ### Myrddin 0.3.0
 - New per-interlude **Output Format** setting: Classic PHO, Forum BBCode, AO3 Forum.
 - Forum BBCode: XenForo 2 (SpaceBattles / SV / QQ) BBCode laid out as a forum

@@ -18,6 +18,8 @@ A PHO interlude generating wizard written with Ember.js!
 - End page constrained with the start page and the number of posts in the thread.
 - Colorize unique tags.
 - Select the output text with one click for easy copying.
+- Dark mode for the editor: the moon/sun button in the navbar. It follows your
+  system setting until you pick one.
 - Three output formats per interlude (see below): Classic PHO BBCode, Forum
   BBCode for SpaceBattles / Sufficient Velocity / Questionable Questing, and an
   AO3 forum layout (HTML + work skin).
@@ -28,18 +30,29 @@ Pick one under **Output Format** in the interlude's settings panel.
 **Classic PHO.** The original plain BBCode layout.
 
 **Forum BBCode (SB / SV / QQ).** XenForo 2 BBCode that lays the thread out like
-a real forum. It uses only tags XenForo ships with (`TABLE`, `SIZE`, `COLOR`,
-`ICODE`, `SPOILER`, `CENTER`, `RIGHT`):
+a real forum. It uses only tags XenForo 2.2+ ships with (`TABLE`, `HEADING`,
+`HR`, `IMG`, `SIZE`, `COLOR`, `ICODE`, `SPOILER`, `CENTER`, `LEFT`, `RIGHT`),
+checked with a test post on a live XenForo forum:
 - A forum header box with the welcome notice, and the "You are viewing" list
   folded into a spoiler.
-- Breadcrumbs, the thread title, and "Discussion in '…' started by …".
+- Breadcrumbs, the thread title as a real heading, and "Discussion in '…'
+  started by …". Threads are separated by a rule.
 - Page navigation with the page numbers as `[ICODE]` buttons.
-- One table per page, so every post on that page lines up. *Sidebar* layout puts
-  a big coloured letter avatar, the username, an Original Poster badge and the
-  user's tags in a left column. *Stacked* layout puts them in a header row
-  above the post, which reads better on phones.
-- Post date and post number (#n) on every post. The numbers follow your start
-  page and posts-per-page settings.
+- One table per page, so every post on that page lines up. Each post gets a
+  shaded header bar.
+  - *Sidebar*: the bar shows the date and post number. The avatar, username,
+    Original Poster badge and user titles sit in a left column.
+  - *Stacked*: the bar shows the avatar, username and titles, with the date and
+    post number above the post. XenForo centres table cells vertically, so the
+    sidebar column floats on long posts. Stacked avoids that and reads better
+    on phones.
+- Avatars: *Initials* (a coloured letter square like XenForo's defaults),
+  *Identicon* or *Cartoon*. These are images from [DiceBear](https://www.dicebear.com/)
+  and the same for a username every time. *Text* uses a big coloured letter
+  and loads nothing.
+- Usernames use the forum's normal colour, except staff (red) and banned users
+  (grey, struck through). User titles are muted; Moderator, Verified and Banned
+  titles keep their colours.
 
 Switch the forum's post editor to BB code mode (the `[ ]` button) before
 pasting. BBCode can't change the forum's own colours, so the theme setting only
@@ -54,7 +67,9 @@ changes the in-app preview. The preview is an approximation.
 
 You get a header bar with nav tabs, a notice box, breadcrumbs, page navigation,
 avatars, staff/verified/banned banners, quotes, spoilers, lists and code blocks.
-There are four themes: Midnight, Graphite, Ember and Daylight. AO3 strips
+There are eight themes: Midnight, Graphite, Blackened Green, Ocean, Violet,
+Crimson, Ember and Daylight. Identicon and Cartoon avatars are DiceBear images;
+Initials and Text are drawn by the work skin itself. AO3 strips
 `style` attributes and doesn't allow media queries in work skins, so everything
 is done with classes. The layout wraps with flexbox (allowed in skins since
 2024): it shows a sidebar on desktop and the user strip above each post on

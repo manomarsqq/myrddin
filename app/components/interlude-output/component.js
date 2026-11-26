@@ -1,7 +1,7 @@
 import Ember from 'ember';
 import moment from 'moment';
 import { bbcodeToHtml } from '../../utils/bbcode';
-import { forumBBCode, ao3Html, workSkinCss, DEFAULT_THEME, THEMES } from '../../utils/forum-format';
+import { forumBBCode, ao3Html, workSkinCss, xfPreviewCss, DEFAULT_THEME, THEMES } from '../../utils/forum-format';
 
 var PREVIEW_STYLE_ID = 'ao3-work-skin-preview';
 
@@ -61,10 +61,6 @@ export default Ember.Component.extend({
     return THEMES[theme] ? theme : DEFAULT_THEME;
   }),
 
-  themeClass: Ember.computed('theme', function() {
-    return 'xf-theme-' + this.get('theme');
-  }),
-
   snapshot: Ember.computed('doc.outputSignature', function() {
     var doc = this.get('doc');
     if (!doc) { return null; }
@@ -89,13 +85,14 @@ export default Ember.Component.extend({
     };
   }),
 
-  outputText: Ember.computed('snapshot', 'format', 'doc.bbLayout', function() {
+  outputText: Ember.computed('snapshot', 'format', 'doc.bbLayout', 'doc.avatarStyle', function() {
     var snapshot = this.get('snapshot');
     if (!snapshot) { return ''; }
+    var avatars = this.get('doc.avatarStyle');
     if (this.get('format') === 'ao3') {
-      return ao3Html(snapshot, { bbToHtml: bbcodeToHtml });
+      return ao3Html(snapshot, { bbToHtml: bbcodeToHtml, avatars: avatars });
     }
-    return forumBBCode(snapshot, { layout: this.get('doc.bbLayout') });
+    return forumBBCode(snapshot, { layout: this.get('doc.bbLayout'), avatars: avatars });
   }),
 
   previewHtml: Ember.computed('outputText', 'format', function() {
@@ -108,14 +105,20 @@ export default Ember.Component.extend({
     return workSkinCss(this.get('theme'));
   }),
 
-  updatePreviewSkin: Ember.on('didInsertElement', Ember.observer('workSkin', function() {
+  // Both previews' theme colours: the AO3 work skin (scoped the way AO3 scopes
+  // it) and the XenForo preview palette.
+  previewCss: Ember.computed('workSkin', 'theme', function() {
+    return scopeCss(this.get('workSkin'), '.ao3-preview #workskin') + '\n' + xfPreviewCss(this.get('theme'));
+  }),
+
+  updatePreviewSkin: Ember.on('didInsertElement', Ember.observer('previewCss', function() {
     var style = document.getElementById(PREVIEW_STYLE_ID);
     if (!style) {
       style = document.createElement('style');
       style.id = PREVIEW_STYLE_ID;
       document.getElementsByTagName('head')[0].appendChild(style);
     }
-    style.textContent = scopeCss(this.get('workSkin'), '.ao3-preview #workskin');
+    style.textContent = this.get('previewCss');
   })),
 
   removePreviewSkin: Ember.on('willDestroyElement', function() {

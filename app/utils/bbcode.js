@@ -100,9 +100,20 @@ export function quoteAuthor(option) {
 // ---------------------------------------------------------------------------
 // Parsing
 
+function parseAttrs(text) {
+  var attrs = {};
+  var re = /([a-z]+)=(?:"([^"]*)"|'([^']*)'|([^\s"']+))/gi;
+  var m;
+  while ((m = re.exec(text || '')) !== null) {
+    attrs[m[1].toLowerCase()] = m[2] !== undefined ? m[2] : (m[3] !== undefined ? m[3] : m[4]);
+  }
+  return attrs;
+}
+
 function tokenize(text) {
   var tokens = [];
-  var re = /\[(\/?)([a-z]+|\*)(?:=([^\]\n]*))?\]/gi;
+  // [tag], [tag=option] or XenForo's attribute form, [IMG width="64px"].
+  var re = /\[(\/?)([a-z]+|\*)(?:=([^\]\n]*)|\s+([a-z]+=[^\]\n]*))?\]/gi;
   var last = 0;
   var match;
 
@@ -132,6 +143,7 @@ function tokenize(text) {
       type: match[1] ? 'close' : 'open',
       name: name,
       option: match[3],
+      attrs: parseAttrs(match[4]),
       source: match[0]
     });
     last = re.lastIndex;
@@ -175,12 +187,15 @@ function parse(text) {
         stack.push(item);
         return;
       }
-      var node = { name: token.name, option: token.option, children: [], source: token.source };
+      var node = { name: token.name, option: token.option, attrs: token.attrs, children: [], source: token.source };
       top().children.push(node);
       if (!VOID_TAGS[token.name]) {
         stack.push(node);
       }
     } else if (token.type === 'close') {
+      if (VOID_TAGS[token.name]) {
+        return; // [HR][/HR]: the closing tag means nothing.
+      }
       var index = inStack(token.name);
       if (index === -1) {
         top().children.push({ name: '#text', text: token.source });
@@ -355,7 +370,9 @@ Renderer.prototype.node = function (node) {
     case 'img': {
       var src = safeUrl(plainText(node));
       if (!src) { return textToHtml(plainText(node)); }
-      return '<img class="' + this.cls('img') + '" src="' + escapeHtml(src) + '" alt="" />';
+      var width = /^(\d{1,4})(px)?$/i.exec(String((node.attrs || {}).width || '').trim());
+      var size = width && !ao3 ? ' style="width: ' + width[1] + 'px"' : '';
+      return '<img class="' + this.cls('img') + '" src="' + escapeHtml(src) + '" alt=""' + size + ' />';
     }
     case 'media': {
       var id = plainText(node).trim();

@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { THEMES } from '../../utils/forum-format';
+import { THEMES, AVATAR_STYLES } from '../../utils/forum-format';
 
 export default Ember.Route.extend({
   settings: Ember.inject.service(),
@@ -48,11 +48,12 @@ export default Ember.Route.extend({
       var theme = THEMES[key];
       return {
         key: key,
-        name: key.charAt(0).toUpperCase() + key.substring(1),
+        name: theme.name,
         label: theme.label,
         swatch: Ember.String.htmlSafe('background-color: ' + theme.block + '; border-color: ' + theme.accent + ';')
       };
     }));
+    controller.set('avatarStyles', AVATAR_STYLES);
     controller.set('model', model);
   },
 
