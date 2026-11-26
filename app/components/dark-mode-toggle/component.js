@@ -17,7 +17,9 @@ function readSaved() {
 // Until you click it, it follows the system's light/dark setting.
 export default Ember.Component.extend({
   tagName: 'div',
-  classNames: ['navbar-header', 'pull-right', 'dark-mode-toggle'],
+  // Not .navbar-header: on phones Bootstrap gives that a -15px side margin,
+  // which pushed this button on top of the preview toolbar next to it.
+  classNames: ['pull-right', 'dark-mode-toggle'],
   dark: false,
 
   setup: Ember.on('init', function() {

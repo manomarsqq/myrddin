@@ -47,6 +47,23 @@ body {
 
 }
 
+// Light/dark switch in the navbar. Its own spacing, no negative margins, so
+// it never overlaps the preview toolbar on narrow screens.
+.dark-mode-toggle {
+  margin-right: 8px;
+
+  .dark-mode-button {
+    padding: 6px 8px;
+    color: #777;
+  }
+
+  .dark-mode-button:hover,
+  .dark-mode-button:focus {
+    color: #444;
+    text-decoration: none;
+  }
+}
+
 .preview-panel {
   border: 1px solid #6DA5FE;
   background-color: #191F2D;
@@ -435,7 +452,8 @@ body.theme-dark {
   }
 
   .navbar-fixed-top { box-shadow: 0 0 2px #000; }
-  .btn-noborder { color: $dk-muted; }
+  .btn-noborder, .dark-mode-button { color: $dk-muted; }
+  .dark-mode-button:hover, .dark-mode-button:focus { color: $dk-text; }
   .btn-noborder:hover, .btn-noborder:focus { color: $dk-text; }
 
   .jumbotron { background: $dk-surface; color: $dk-text; }
