@@ -12,6 +12,8 @@
   AO3 output.
 - Configurable forum name. Copy buttons for the output.
 - Node unit tests for the formatters (`npm run test:formats`).
+- `scripts/build-legacy.sh` builds the 2015 toolchain on modern machines, and a
+  GitHub Actions workflow builds every push and deploys `master` to GitHub Pages.
 
 ### Mryddin 0.2.0
 - Move the Output/Preview selector into the nav bar, so that they are more accessible.

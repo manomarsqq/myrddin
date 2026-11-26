@@ -81,24 +81,26 @@ Post bodies can use BBCode in all formats. The forum formats convert it.
 - Add acceptance and unit tests.
 - Import/Export from gdrive/file so that edits on one device can be accessed from another. (Maaaaybe?)
 
-###Building (2026)
-The app is built with ember-cli 0.2.x, which does not run on modern Node. What
-works:
-1. Get a portable [Node 4.9.1](https://nodejs.org/dist/v4.9.1/) for running the
-   build.
-2. Install dependencies with a modern npm, pinned to the old package tree:
-   `npm install --before=2016-06-01 --ignore-scripts --legacy-peer-deps`
-   (change `git@github.com:` to `git+https://github.com/` for `ember-pikaday` if
-   you have no GitHub SSH key).
-3. Fetch node-sass's prebuilt binary with Node 4:
-   `cd node_modules/node-sass && <node4>/node scripts/install.js`
-4. Copy `node_modules/font-awesome` into
-   `node_modules/ember-cli-font-awesome/node_modules/`, and `node_modules/ic-ajax`
-   into `node_modules/ember-cli-ic-ajax/node_modules/`. Those addons expect
-   npm 2's nested layout.
-5. `npx bower install`, then `npx bower install jquery#1.11.3` (Ember 1.12
-   rejects jQuery 1.12).
-6. `<node4>/node node_modules/ember-cli/bin/ember build`
+###Building and deploying (2026)
+The app is built with ember-cli 0.2.x, which doesn't run on modern Node.
+`scripts/build-legacy.sh` handles that. It installs the 2016 package tree with
+a modern npm, swaps in 2015 releases of the plugins that broke later, restores
+the nested layout two addons expect, pins jQuery to 1.11.3 for Ember 1.12, and
+then builds with Node 4.
+
+**Automatic:** `.github/workflows/deploy.yml` runs the formatter tests and the
+build on every push and pull request. A push to `master` also publishes `dist/`
+to the `gh-pages` branch. For the site to go live, turn on GitHub Pages once
+under *Settings › Pages* with the source set to *Deploy from a branch*,
+`gh-pages`, `/ (root)`.
+
+**By hand** (Linux, macOS or Git Bash on Windows), with a modern Node on `PATH`
+and a portable [Node 4.9.1](https://nodejs.org/dist/v4.9.1/):
+
+    NODE4=/path/to/node-v4.9.1/bin/node bash scripts/build-legacy.sh production
+
+Use `development` instead of `production` for an unminified build. The output
+goes to `dist/`.
 
 The forum/AO3 formatters (`app/utils/`) don't depend on Ember. You can test
 them on any modern Node with `npm run test:formats`.
