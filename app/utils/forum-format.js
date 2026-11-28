@@ -489,23 +489,24 @@ export function forumBBCode(snapshot, options) {
 // ---------------------------------------------------------------------------
 // AO3 chapter HTML + work skin.
 //
-// The HTML is the Classic PHO transcript, line for line, so a reader with
-// "Hide Creator's Style" on, or anyone reading an AO3 download (downloads
-// leave work skins out), sees the classic layout. The work skin then rebuilds
-// the forum from that same markup:
-//   - `fm-x` spans hold classic-only text ("Posted On", "►", brackets) and the
-//     skin hides them
+// The HTML is Classic PHO's own markup: the same paragraphs, the same <br />
+// line breaks, the same bold and underline. A reader with "Hide Creator's
+// Style" on, or anyone reading an AO3 download (downloads leave work skins
+// out), gets Classic PHO. The work skin rebuilds the forum from it:
+//   - `fm-x` spans hold classic-only text ("Posted On", "►", brackets) and
+//     `fm-br` line breaks; the skin hides both and lays the pieces of each
+//     line out as blocks (the user column is a float, the title strip and the
+//     tabs come out of the first paragraph with negative margins)
 //   - forum-only text comes from the skin's ::before rules, so it isn't there
 //     without the skin. AO3 only allows a fixed string in `content` (no
 //     attr(), no counter()), so per-user text such as avatar letters, post
 //     numbers and the forum name is spelled out with empty spans, one class
 //     per character (see glyphs()). That keeps one skin good for any interlude.
-//   - wrapper divs and spans with no text of their own are invisible unstyled
 //
 // AO3 rules this respects: no `style` attributes (`align` is allowed, and is
-// how the ■ lines are centred), no media queries (the layout wraps with
-// flexbox), each block element on its own line and no newlines between
-// inline elements, so AO3's paragraph pass doesn't add stray <br /> tags.
+// how the ■ lines are centred; a <dd> is the indent), no media queries or
+// grid, and nothing for AO3's paragraph pass to change (see ao3Html). The
+// tests check the hidden view against a separate transcription of Classic.
 
 var GLYPH_PUNCT = {
   ' ': 'sp', '_': 'us', '-': 'hy', '.': 'dt', '\'': 'ap', '!': 'ex', '?': 'qm', '&': 'am',
@@ -585,32 +586,51 @@ function htmlBanners(user, isOp) {
   return banners;
 }
 
-// One post. Unstyled it reads like Classic PHO:
-//   ►Bagrat (Original Poster) (Veteran Member)
-//   Replied On Jan 2nd 2011:
-//   ...content...
-// Private messages read "Bagrat:" followed by the message.
+// A line break that only the Classic layout uses; the skin hides it and lays
+// the pieces out as blocks instead.
+var FM_BR = '<br class="fm-br" />';
+
+// The rendered body as its first paragraph's contents plus everything after
+// it. Classic PHO runs the first paragraph straight on from "Posted On ...:",
+// in the same paragraph, so the HTML has to as well.
+function splitLead(bodyHtml) {
+  var m = /^<p>([\s\S]*?)<\/p>(?:\n|$)/.exec(bodyHtml);
+  return m ? { first: m[1], rest: bodyHtml.slice(m[0].length) } : { first: '', rest: bodyHtml };
+}
+
+// One post. Unstyled it is exactly the Classic PHO paragraph:
+//   <strong>►Bagrat </strong> (Original Poster) (Veteran Member)<br />
+//   Replied On Jan 2nd 2011:<br />
+//   first paragraph of the post</p> <p>the rest ...
+// and in a private message "<strong>Bagrat:</strong> first paragraph".
+// `o.lead` is put at the start of the first paragraph (the thread title).
 function htmlPost(post, o, bbToHtml) {
   var name = userName(post.user);
+  // Classic PHO prints a post's line breaks as they are, blank lines included,
+  // in one paragraph; AO3 also drops paragraph margins inside a reply's <dd>.
+  var body = splitLead(bbToHtml ? bbToHtml(post.content || '', 'ao3', { lineBreaks: true }) :
+    (post.content ? '<p>' + escapeHtml(post.content).replace(/\r?\n/g, '<br />') + '</p>' : ''));
   var nameHtml = '<strong class="fm-name">' + (o.reply ? classicOnly('►') : '') + escapeHtml(name) +
-    (o.pm ? classicOnly(':') : '') + '</strong>';
-  var ident = [nameHtml].concat(o.pm ? [] : htmlBanners(post.user, o.isOp)).join(' ');
-  var date = o.pm ? '' : classicOnly(o.label + ' ') +
-    '<span class="fm-date">' + escapeHtml(post.classicDate || post.date || '') + '</span>' + classicOnly(':');
-  var body = bbToHtml ? bbToHtml(post.content || '', 'ao3') : escapeHtml(post.content || '');
+    classicOnly(o.pm ? ':' : ' ') + '</strong>';
+  var user = '<span class="fm-user"><span class="fm-avatar fm-av' + avatarIndex(name) + '">' + glyphs(initial(name)) + '</span>' +
+    [nameHtml].concat(o.pm ? [] : htmlBanners(post.user, o.isOp)).join(' ') + '</span>';
+  var num = '<span class="fm-num">' + glyphs(o.number) + '</span>';
+  var lead;
 
+  if (o.pm) {
+    lead = user + '<span class="fm-attr">' + num + '</span>' + (body.first ? ' ' + body.first : '');
+  } else {
+    lead = user + FM_BR + '<span class="fm-attr">' + classicOnly(o.label + ' ') +
+      '<span class="fm-date">' + escapeHtml(post.classicDate || post.date || '') + '</span>' + classicOnly(':') + num + '</span>' +
+      (body.first ? FM_BR + body.first : '');
+  }
+
+  var tag = o.reply ? 'dd' : 'div';
   return [
-    '<div class="fm-post">',
-    '<div class="fm-user"><span class="fm-avatar fm-av' + avatarIndex(name) + '">' + glyphs(initial(name)) + '</span>' +
-      '<span class="fm-ident">' + ident + '</span></div>',
-    '<div class="fm-main">',
-    '<div class="fm-attr">' + date + '<span class="fm-num">' + glyphs(o.number) + '</span></div>',
-    '<div class="fm-body">',
-    body,
-    '</div>',
-    '<div class="fm-actions"></div>',
-    '</div>',
-    '</div>'
+    '<' + tag + ' class="fm-post' + (o.cls ? ' ' + o.cls : '') + '">',
+    '<p class="fm-lead">' + (o.lead || '') + lead + '</p>',
+    body.rest,
+    '</' + tag + '>'
   ].filter(function (line) { return line !== ''; }).join('\n');
 }
 
@@ -618,18 +638,19 @@ function htmlThread(thread, snapshot, bbToHtml) {
   var info = threadLayout(thread, snapshot.postsPerPage);
   var op = thread.op || {};
   var crumbs = ['Boards'].concat(locationParts(thread.location)).map(escapeHtml).join('<span class="fm-sep"> ► </span>');
+  var head = '<span class="fm-thead">' +
+    '<strong class="fm-title">' + classicOnly('♦ Topic: ') + escapeHtml(thread.name || '') + '</strong>' + FM_BR +
+    '<strong class="fm-crumbs">' + classicOnly('In: ') + crumbs + '</strong>' + FM_BR + '</span>';
   var out = [];
 
   out.push('<div class="fm-thread">');
-  out.push('<div class="fm-thead">');
-  out.push('<div class="fm-title"><strong>' + classicOnly('♦&nbsp; Topic: ') + escapeHtml(thread.name || '') + '</strong></div>');
-  out.push('<div class="fm-crumbs"><strong>' + classicOnly('In:&nbsp; ') + crumbs + '</strong></div>');
-  out.push('</div>');
-  out.push(htmlPost(op, { isOp: !!op.user, label: 'Posted On', number: 1 }, bbToHtml));
+  out.push(htmlPost(op, { isOp: !!op.user, label: 'Posted On', number: 1, lead: head, cls: 'fm-op' }, bbToHtml));
 
   info.pages.forEach(function (page) {
     out.push(htmlPageHead(page.page, info.endPage));
-    out.push('<blockquote class="fm-replies">');
+    // Classic indents the replies. A <dd> is the one indent AO3 gives without
+    // a line beside it (a blockquote has one, and loses its paragraph spacing).
+    out.push('<dl class="fm-replies">');
     page.posts.forEach(function (entry) {
       out.push(htmlPost(entry.post, {
         reply: true,
@@ -638,7 +659,7 @@ function htmlThread(thread, snapshot, bbToHtml) {
         number: entry.number
       }, bbToHtml));
     });
-    out.push('</blockquote>');
+    out.push('</dl>');
     out.push(htmlPageEnd(page.page, info.endPage));
   });
 
@@ -650,12 +671,10 @@ function htmlThread(thread, snapshot, bbToHtml) {
 function htmlConversation(thread, snapshot, bbToHtml) {
   var out = [];
   out.push('<div class="fm-thread fm-pm">');
-  out.push('<div class="fm-thead">');
-  out.push('<div class="fm-pmfrom"><strong>' + classicOnly('♦&nbsp; ') + 'Private Message ' +
-    escapeHtml(pmHeadline(thread, snapshot.perspective)) + '</strong></div>');
-  out.push('<div class="fm-title">' + classicOnly('<strong>Subject:</strong> ') + '<span class="fm-pm-tag"></span>' +
-    escapeHtml(thread.name || '') + '</div>');
-  out.push('</div>');
+  out.push('<p class="fm-pmhead"><strong class="fm-pmfrom">' + classicOnly('♦ ') + 'Private Message ' +
+    escapeHtml(pmHeadline(thread, snapshot.perspective)) + '</strong>' + FM_BR +
+    '<span class="fm-title"><strong class="fm-x">Subject:</strong>' + classicOnly(' ') + '<span class="fm-pm-tag"></span>' +
+    escapeHtml(thread.name || '') + '</span></p>');
   conversationEntries(thread).forEach(function (entry) {
     out.push(htmlPost(entry.post, { pm: true, number: entry.number }, bbToHtml));
   });
@@ -664,27 +683,33 @@ function htmlConversation(thread, snapshot, bbToHtml) {
   return out.join('\n');
 }
 
+// AO3 rewrites chapter HTML before storing it: text sitting directly in a
+// <div> or <blockquote> gets wrapped in a new <p>, and anything block-level
+// inside a <p> splits it. Both change what a reader without the work skin
+// sees. So all text here is inside <p> tags, divs only ever hold blocks, and
+// lines are joined by <br /> the way Classic PHO joins them; AO3 then has
+// nothing to change.
 export function ao3Html(snapshot, options) {
   options = options || {};
   var bbToHtml = options.bbToHtml;
   var forumName = snapshot.forumName || DEFAULT_FORUM_NAME;
+  // Classic PHO always says Parahumans Online; another forum name only shows
+  // with the skin.
+  var welcomeName = forumName === DEFAULT_FORUM_NAME ? escapeHtml(forumName) :
+    classicOnly(escapeHtml(DEFAULT_FORUM_NAME)) + '<span class="fm-fname">' + glyphs(forumName) + '</span>';
+  var notice = ['<strong class="fm-welcome">Welcome to the ' + welcomeName + ' message boards.</strong>',
+    '<span class="fm-login">You are currently logged in, <u>' + escapeHtml(userName(snapshot.perspective)) + '</u></span>',
+    classicOnly('You are viewing:')
+  ].concat(viewingLines(snapshot).map(function (line) {
+    return '<span class="fm-vl">' + classicOnly('• ') + escapeHtml(line) + '</span>';
+  }));
   var out = [];
 
   out.push('<div class="fm-forum">');
-  out.push('<div class="fm-header"><span class="fm-logo">' + glyphs(forumName) + '</span>' +
-    '<span class="fm-navrow"><span class="fm-tab fm-tab-on fm-tab-forums"></span><span class="fm-tab fm-tab-new"></span>' +
-    '<span class="fm-tab fm-tab-members"></span></span></div>');
-  out.push('<p class="fm-sq" align="center">■</p>');
-  out.push('<div class="fm-notice">');
-  out.push('<div class="fm-welcome"><strong>Welcome to the ' + escapeHtml(forumName) + ' message boards.</strong></div>');
-  out.push('<div>You are currently logged in, <u>' + escapeHtml(userName(snapshot.perspective)) + '</u></div>');
-  out.push('<div class="fm-x">You are viewing:</div>');
-  out.push('<div class="fm-viewing">');
-  viewingLines(snapshot).forEach(function (line) {
-    out.push('<div class="fm-vl">' + classicOnly('•&nbsp; ') + escapeHtml(line) + '</div>');
-  });
-  out.push('</div>');
-  out.push('</div>');
+  out.push('<p class="fm-top" align="center">' + classicOnly('■') + '<span class="fm-header"><span class="fm-logo">' + glyphs(forumName) +
+    '</span><span class="fm-navrow"><span class="fm-tab fm-tab-on fm-tab-forums"></span><span class="fm-tab fm-tab-new"></span>' +
+    '<span class="fm-tab fm-tab-members"></span></span></span></p>');
+  out.push('<p class="fm-notice">' + notice.join(FM_BR) + '</p>');
   out.push('<p class="fm-sq" align="center">■</p>');
 
   (snapshot.threads || []).forEach(function (thread) {
@@ -709,9 +734,12 @@ export function workSkinCss(themeName) {
     'font-family: ' + sans, 'font-size: 0.95em', 'line-height: 1.5', 'border: 1px solid ' + t.border, 'border-radius: 4px']);
   rule('.fm-forum p', ['margin: 0 0 0.75em']);
   rule('.fm-forum a', ['color: ' + t.accent]);
-  // Classic-only text and the ■ separators.
-  rule('.fm-x, .fm-sq', ['display: none']);
+  // Classic-only text, its line breaks and the ■ separators. Everything the
+  // forum shows as its own block is laid out as one below.
+  rule('.fm-x, .fm-sq, .fm-br', ['display: none']);
 
+  // The forum header sits in the first ■ line.
+  rule('.fm-forum .fm-top', ['margin: 0', 'text-align: left']);
   rule('.fm-header', ['display: block', 'background: ' + t.header, 'color: ' + t.headerText, 'border-bottom: 3px solid ' + t.accent,
     'border-radius: 4px 4px 0 0']);
   rule('.fm-logo', ['display: block', 'padding: 0.6em 0.9em 0.3em', 'font-size: 1.6em', 'font-weight: bold', 'letter-spacing: 0.02em']);
@@ -722,27 +750,29 @@ export function workSkinCss(themeName) {
   rule('.fm-tab-new:before', ['content: "What’s new"']);
   rule('.fm-tab-members:before', ['content: "Members"']);
 
-  rule('.fm-notice', ['margin: 0.75em', 'padding: 0.6em 0.9em', 'background: ' + t.notice, 'border: 1px solid ' + t.border,
+  rule('.fm-forum .fm-notice', ['margin: 0.75em', 'padding: 0.6em 0.9em', 'background: ' + t.notice, 'border: 1px solid ' + t.border,
     'border-left: 4px solid ' + t.accent, 'border-radius: 3px']);
-  rule('.fm-viewing', ['margin-top: 0.3em', 'font-size: 0.8em', 'color: ' + t.muted]);
-  rule('.fm-vl', ['display: inline', 'margin: 0 0.9em 0 0']);
+  rule('.fm-welcome, .fm-login', ['display: block']);
+  rule('.fm-vl', ['display: inline-block', 'margin: 0.3em 0.9em 0 0', 'font-size: 0.8em', 'color: ' + t.muted]);
 
   rule('.fm-thread', ['margin: 1.25em 0.75em 0.75em']);
-  rule('.fm-thead', ['display: flex', 'flex-direction: column', 'margin-bottom: 0.6em']);
-  rule('.fm-crumbs, .fm-pmfrom', ['order: -1', 'font-size: 0.8em', 'color: ' + t.muted]);
-  rule('.fm-crumbs strong, .fm-pmfrom strong', ['font-weight: normal']);
+  // The thread title is the header strip of the first post's box: it starts
+  // inside that post's first paragraph, so it reaches out over the padding.
+  rule('.fm-thead', ['display: flex', 'flex-direction: column', 'margin: -0.6em -0.9em 0.6em -9.4em', 'padding: 0.5em 0.9em 0.6em',
+    'background: ' + t.notice, 'border-bottom: 1px solid ' + t.border]);
+  rule('.fm-forum .fm-pmhead', ['display: flex', 'flex-direction: column', 'margin: 0 0 0.6em']);
+  rule('.fm-crumbs, .fm-pmfrom', ['order: -1', 'display: block', 'font-size: 0.8em', 'font-weight: normal', 'color: ' + t.muted]);
   rule('.fm-crumbs:before', ['content: "Forums ► "']);
   rule('.fm-pmfrom:before', ['content: "Inbox ► "']);
-  rule('.fm-title', ['margin: 0.2em 0 0', 'font-size: 1.45em', 'line-height: 1.3', 'color: ' + t.text]);
-  rule('.fm-title strong', ['font-weight: normal']);
+  rule('.fm-title', ['display: block', 'margin: 0.2em 0 0', 'font-size: 1.45em', 'font-weight: normal', 'line-height: 1.3', 'color: ' + t.text]);
   rule('.fm-pm-tag:before', ['content: "Private"']);
   rule('.fm-pm-tag', ['display: inline-block', 'margin-right: 0.4em', 'padding: 0.1em 0.45em', 'vertical-align: middle',
     'font-size: 0.55em', 'font-weight: bold', 'letter-spacing: 0.05em', 'text-transform: uppercase',
     'background: ' + t.accent, 'color: ' + t.accentText, 'border-radius: 3px']);
   rule('.fm-pm .fm-post', ['border-left: 3px solid ' + t.accent]);
 
-  // AO3 indents blockquotes; the replies shouldn't be.
-  rule('.fm-replies', ['margin: 0', 'padding: 0', 'border: none', 'font-family: ' + sans, 'font-size: 1em']);
+  // The replies' list, which AO3 indents; the forum doesn't.
+  rule('.fm-forum .fm-replies', ['margin: 0', 'padding: 0', 'border: none']);
 
   rule('.fm-forum .fm-pagehead, .fm-forum .fm-pagenav', ['margin: 0.6em 0', 'font-size: 0.8em', 'color: ' + t.muted]);
   rule('.fm-pagehead strong, .fm-pagenav strong', ['font-weight: normal']);
@@ -757,27 +787,26 @@ export function workSkinCss(themeName) {
   rule('.fm-prev:before', ['content: "‹ Prev"']);
   rule('.fm-next:before', ['content: "Next ›"']);
 
-  rule('.fm-post', ['display: flex', 'flex-wrap: wrap', 'margin: 0 0 0.6em', 'background: ' + t.block,
-    'border: 1px solid ' + t.border, 'border-radius: 3px']);
-  // min-width: 0 lets a long username wrap instead of widening this one
-  // post's column, so every post's user column lines up.
-  rule('.fm-user', ['display: flex', 'flex-wrap: wrap', 'flex: 1 0 8.5em', 'min-width: 0', 'justify-content: center', 'align-items: center',
-    'align-content: flex-start', 'padding: 0.75em 0.5em', 'background: ' + t.user, 'border-right: 1px solid ' + t.border,
-    'text-align: center']);
-  rule('.fm-avatar', ['display: block', 'flex: 0 0 auto', 'width: 2.3em', 'height: 2.3em', 'margin: 0.1em 0.3em 0.3em', 'line-height: 2.3em',
+  // A post is the Classic paragraph(s) in a box. The user column floats out
+  // into the box's left padding; its huge bottom padding, cancelled by the
+  // same negative margin, carries its background to the bottom of the box,
+  // which clips it (overflow: hidden also makes the box wrap the column).
+  rule('.fm-post', ['overflow: hidden', 'margin: 0 0 0.6em', 'padding: 0.6em 0.9em 0.6em 9.4em', 'background: ' + t.block,
+    'border: 1px solid ' + t.border, 'border-radius: 3px', 'word-wrap: break-word']);
+  rule('.fm-user', ['float: left', 'display: block', 'box-sizing: border-box', 'width: 8.5em', 'margin: -0.6em 0 -999em -9.4em',
+    'padding: 0.75em 0.4em 999em', 'background: ' + t.user, 'border-right: 1px solid ' + t.border, 'text-align: center',
+    'line-height: 1.4']);
+  rule('.fm-avatar', ['display: block', 'width: 2.3em', 'height: 2.3em', 'margin: 0 auto 0.15em', 'line-height: 2.3em',
     'font-size: 1.9em', 'font-weight: bold', 'text-align: center', 'color: #ffffff', 'border-radius: 4px']);
-  rule('.fm-ident', ['display: block', 'flex: 0 1 auto', 'min-width: 0', 'max-width: 100%', 'padding: 0 0.3em']);
-  rule('.fm-name', ['display: block', 'font-weight: bold', 'font-size: 1.05em', 'color: ' + t.accent, 'word-wrap: break-word']);
-  rule('.fm-banner', ['display: block', 'margin: 0.25em auto 0', 'padding: 0.1em 0.5em', 'font-size: 0.72em', 'font-weight: bold',
+  rule('.fm-name', ['display: block', 'font-weight: bold', 'font-size: 1.05em', 'color: ' + t.accent]);
+  rule('.fm-banner', ['display: block', 'margin: 0.3em auto 0', 'padding: 0.1em 0.4em', 'font-size: 0.72em', 'font-weight: bold',
     'line-height: 1.5', 'color: #ffffff', 'border-radius: 3px']);
-  rule('.fm-main', ['display: flex', 'flex-direction: column', 'flex: 999 1 22em', 'min-width: 0', 'padding: 0.6em 0.9em']);
-  rule('.fm-attr', ['display: flex', 'justify-content: space-between', 'padding-bottom: 0.4em', 'margin-bottom: 0.6em',
-    'border-bottom: 1px solid ' + t.border, 'font-size: 0.8em', 'color: ' + t.muted]);
-  rule('.fm-num', ['margin-left: auto']);
+  rule('.fm-attr', ['display: block', 'padding-bottom: 0.4em', 'margin-bottom: 0.6em', 'border-bottom: 1px solid ' + t.border,
+    'font-size: 0.8em', 'color: ' + t.muted]);
+  rule('.fm-num', ['float: right']);
   rule('.fm-num:before', ['content: "#"']);
-  rule('.fm-body', ['flex: 1 0 auto', 'word-wrap: break-word']);
-  rule('.fm-actions', ['margin-top: 0.6em', 'font-size: 0.75em', 'color: ' + t.muted, 'text-align: right', 'word-spacing: 1em']);
-  rule('.fm-actions:before', ['content: "Report Like Quote Reply"']);
+  rule('.fm-post:after', ['content: "Report Like Quote Reply"', 'display: block', 'margin-top: 0.6em', 'font-size: 0.75em',
+    'color: ' + t.muted, 'text-align: right', 'word-spacing: 1em']);
 
   BB_PALETTE.forEach(function (color, i) {
     rule('.fm-av' + i + ', .fm-bn' + i, ['background: ' + color]);
@@ -790,6 +819,7 @@ export function workSkinCss(themeName) {
   // BBCode used inside post bodies.
   rule('.fm-quote', ['margin: 0.5em 0 0.9em', 'padding: 0', 'background: ' + t.quote, 'border: 1px solid ' + t.border,
     'border-left: 3px solid ' + t.accent, 'font-family: ' + sans]);
+  rule('.fm-forum .fm-quote-head, .fm-forum .fm-spoiler-head, .fm-forum .fm-code-head', ['margin: 0']);
   rule('.fm-quote-head', ['padding: 0.35em 0.7em', 'font-size: 0.85em', 'font-weight: bold', 'color: ' + t.accent]);
   rule('.fm-quote-body', ['padding: 0.35em 0.7em 0.1em']);
   rule('.fm-spoiler', ['margin: 0.5em 0 0.9em', 'border: 1px solid ' + t.border, 'border-radius: 3px']);

@@ -1,5 +1,16 @@
 # Myrddin Changelog
 
+### Myrddin 0.5.2
+- AO3 Forum output with *Hide Creator's Style* on now matches Classic PHO line
+  for line. AO3 was wrapping each line held in a `<div>` in its own paragraph,
+  which spread the transcript out with gaps. The chapter HTML is now Classic's
+  own markup (paragraphs and `<br />` line breaks), and replies are indented
+  with a `<dd>` instead of a blockquote, which AO3 drew with a grey line.
+- The forum look on AO3 is fixed too: the post number sits on the right
+  instead of running into the date, and long usernames wrap inside the user
+  column.
+- Copy the new work skin into AO3 again, and paste the chapter text again.
+
 ### Myrddin 0.5.1
 - Fix AO3 refusing to save the work skin ("There don't seem to be any rules
   for .fm-g-lp:before"). AO3's CSS parser reads a lone "(" as the start of a

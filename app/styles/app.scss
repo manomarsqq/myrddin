@@ -381,16 +381,23 @@ a.highlight {
   background: #ffffff;
   color: #2a2a2a;
 
+  // Taken from AO3's default site skin, so "Hide creator's style" previews
+  // what readers get.
   .userstuff {
-    font-family: Georgia, serif;
+    font-family: 'Lucida Grande', 'Lucida Sans Unicode', Verdana, Helvetica, sans-serif;
     font-size: 15px;
     line-height: 1.5;
 
     p { margin: 1.286em auto; }
-    blockquote { margin: 1.286em 3em; padding: 0; border-left: 0; font-size: inherit; }
+    blockquote { margin: 0.643em 0.643em 0.643em 1.5em; padding: 0.75em; border-left: 2px solid #999; font-size: inherit; }
+    blockquote p:first-child { margin-top: 0; }
+    blockquote p:last-child { margin-bottom: 0; }
+    dl { margin: 1.5em 0; }
+    dd { margin: 1.25em 0 1.25em 3em; }
+    dd p { margin: 0; }
     code { color: inherit; }
     h3 { font-size: 1.143em; font-weight: 900; margin: 1.375em 0 0.5em; }
-    ul { margin: 0 0 1.286em; padding-left: 1.5em; }
+    ul { margin: 1.125em auto; padding: 0 1em; }
   }
 }
 

@@ -297,9 +297,18 @@ Renderer.prototype.children = function (children, paragraphs) {
 
   var out = [];
   var buffer = [];
+  var lineBreaks = this.options.lineBreaks;
   var flush = function () {
     var html = buffer.join('');
     buffer = [];
+    // `lineBreaks`: one <p> per run, blank lines kept as <br /><br />, the way
+    // Classic PHO prints a post.
+    if (lineBreaks) {
+      if (html.replace(/<br \/>|\s|&nbsp;/g, '') !== '') {
+        out.push('<p>' + html + '</p>');
+      }
+      return;
+    }
     html.split(/(?:<br \/>\s*){2,}/).forEach(function (para) {
       para = para.replace(/^(?:<br \/>)+|(?:<br \/>)+$/g, '');
       if (para.replace(/\s|&nbsp;/g, '') !== '') {
@@ -394,7 +403,10 @@ Renderer.prototype.node = function (node) {
     }
     case 'quote': {
       var author = quoteAuthor(opt);
-      var head = author ? '<div class="' + this.cls('quote-head') + '">' + escapeHtml(author) + ' said:</div>' : '';
+      // AO3 wraps text that sits straight in a <div> in a new <p>, so on AO3 the
+      // one-line headers are paragraphs to begin with.
+      var headTag = ao3 ? 'p' : 'div';
+      var head = author ? '<' + headTag + ' class="' + this.cls('quote-head') + '">' + escapeHtml(author) + ' said:</' + headTag + '>' : '';
       return '<blockquote class="' + this.cls('quote') + '">' + head +
         '<div class="' + this.cls('quote-body') + '">' + inner(ao3) + '</div></blockquote>';
     }
@@ -402,7 +414,7 @@ Renderer.prototype.node = function (node) {
       var title = stripQuotes(opt || '');
       var label2 = 'Spoiler' + (title ? ': ' + escapeHtml(title) : '');
       if (ao3) {
-        return '<div class="fm-spoiler"><div class="fm-spoiler-head">' + label2 + '</div>' +
+        return '<div class="fm-spoiler"><p class="fm-spoiler-head">' + label2 + '</p>' +
           '<div class="fm-spoiler-body">' + inner(true) + '</div></div>';
       }
       return '<details class="bb-spoiler"><summary class="bb-spoiler-head">' + label2 + '</summary>' +
@@ -415,7 +427,8 @@ Renderer.prototype.node = function (node) {
     case 'html': {
       var codeText = node.raw !== undefined ? node.raw : plainText(node);
       codeText = codeText.replace(/^\r?\n/, '').replace(/\r?\n$/, '');
-      var codeHead = '<div class="' + this.cls('code-head') + '">' + (node.name === 'code' ? 'Code' : node.name.toUpperCase()) + ':</div>';
+      var codeHeadTag = ao3 ? 'p' : 'div';
+      var codeHead = '<' + codeHeadTag + ' class="' + this.cls('code-head') + '">' + (node.name === 'code' ? 'Code' : node.name.toUpperCase()) + ':</' + codeHeadTag + '>';
       return '<div class="' + this.cls('code') + '">' + codeHead + '<pre>' + escapeHtml(codeText) + '</pre></div>';
     }
     case 'icode':

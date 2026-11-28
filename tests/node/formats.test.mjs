@@ -196,68 +196,6 @@ test('AO3 html: no style attributes, no forbidden tags, balanced divs', function
   assert.ok(html.includes('fm-bn-op"><span class="fm-x">(</span>Original Poster<span class="fm-x">)</span>'));
 });
 
-// What a reader sees with "Hide Creator's Style" on: the text, one line per
-// block, with no CSS at all.
-function unstyledText(html) {
-  return html
-    .replace(/<br \/>/g, '\n')
-    .replace(/<\/?(div|p|blockquote)\b[^>]*>/g, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
-    .split('\n')
-    .map(function (line) { return line.replace(/\s+/g, ' ').trim(); })
-    .filter(function (line) { return line; });
-}
-
-test('AO3 with the creator\'s style hidden reads exactly like Classic PHO', function () {
-  var snap = snapshot(3, { postsPerPage: 2 });
-  snap.threads[0].endPage = 2;
-  snap.threads[0].op.classicDate = 'Jan 1st 2011';
-  snap.threads[0].replies.forEach(function (post) { post.classicDate = 'Jan 2nd 2011'; });
-  snap.threads.push(conversation(bagrat, [tin]));
-  assert.deepEqual(unstyledText(ao3Html(snap, { bbToHtml: bbcodeToHtml })), [
-    '■',
-    'Welcome to the Parahumans Online message boards.',
-    'You are currently logged in, Tin_Mother',
-    'You are viewing:',
-    '• Threads you have replied to',
-    '• AND Threads that have new replies',
-    '• OR private message conversations with new replies',
-    '• Thread OP is displayed.',
-    '• Two posts per page',
-    '• Last ten messages in private message history.',
-    '• Threads and private messages are ordered chronologically.',
-    '■',
-    '♦ Topic: Endbringer Thread',
-    'In: Boards ► Places ► America ► Brockton Bay',
-    'Bagrat (Original Poster) (Veteran Member) (Moderator)',
-    'Posted On Jan 1st 2011:',
-    'First post',
-    'bold',
-    '(Showing page 1 of 2)',
-    '►Tin_Mother',
-    'Replied On Jan 2nd 2011:',
-    'Reply 1',
-    'End of Page. 1, 2',
-    '(Showing page 2 of 2)',
-    '►Bagrat (Original Poster) (Veteran Member) (Moderator)',
-    'Replied On Jan 2nd 2011:',
-    'Reply 2',
-    '►Tin_Mother',
-    'Replied On Jan 2nd 2011:',
-    'Reply 3',
-    'End of Page. 1, 2',
-    '■',
-    '♦ Private Message from Bagrat',
-    'Subject: About last night',
-    'Bagrat:',
-    'Hey.',
-    'Tin_Mother:',
-    'Message 2',
-    '■'
-  ]);
-});
-
 test('Classic page list, with the last page included', function () {
   assert.deepEqual(classicPageList(1, 2), [1, 2]);
   assert.deepEqual(classicPageList(2, 2), [1, 2]);
@@ -277,7 +215,7 @@ test('glyphs spell text with empty spans the work skin fills in', function () {
 test('AO3 html never puts a newline between inline elements', function () {
   var html = ao3Html(snapshot(3), { bbToHtml: bbcodeToHtml });
   html.split('\n').forEach(function (line) {
-    assert.match(line, /^<\/?(div|p|ul|h3|blockquote|table)\b/, 'line starts with a block tag: ' + line);
+    assert.match(line, /^<\/?(div|p|ul|h3|blockquote|table|dl|dd)\b/, 'line starts with a block tag: ' + line);
   });
 });
 
@@ -433,16 +371,174 @@ test('forum BBCode conversation stays balanced and renders', function () {
   });
 });
 
-test('AO3: a conversation gets its own block, with no banners, dates or pages', function () {
-  var snap = snapshot(1);
-  snap.threads.push(conversation(tin, [bagrat, weld]));
-  var html = ao3Html(snap, { bbToHtml: bbcodeToHtml });
-  var pmPart = html.substring(html.indexOf('fm-pm'));
-  assert.ok(pmPart.includes('<div class="fm-pmfrom"><strong><span class="fm-x">♦&nbsp; </span>Private Message to Bagrat, Weld</strong></div>'));
-  assert.ok(pmPart.includes('<div class="fm-title"><span class="fm-x"><strong>Subject:</strong> </span><span class="fm-pm-tag"></span>About last night</div>'));
-  assert.equal((pmPart.match(/class="fm-post"/g) || []).length, 3);
-  assert.doesNotMatch(pmPart, /fm-banner|fm-pagenav|fm-date|fm-replies/);
-  assert.doesNotMatch(html, /style=/);
-  assert.equal(html.split('<div').length, html.split('</div>').length);
-  assert.ok(workSkinCss('midnight').includes('.fm-pm .fm-post {'));
+// --- AO3 without the work skin -------------------------------------------
+//
+// Classic PHO, transcribed separately from the template in
+// app/documents/view/template.hbs (the preview branch), as AO3 can take it:
+// align="center" for the centred ■ lines and a <dd> per indented reply,
+// since AO3 drops style attributes. Post text is rendered the way a
+// forum renders the Classic BBCode.
+function classicPageString(index, startPage, endPage, perPage) {
+  // thread-page-footer's pageString, in its HTML (preview) form.
+  var offset = startPage === 1 ? 1 : 0;
+  var current = Math.floor((index + offset) / perPage + startPage);
+  var s = '';
+  var i;
+  if (current - 1 > 5) {
+    s += '<u>1</u>, <u>2</u>, <u>3</u> ... <u>' + (current - 2) + '</u>, <u>' + (current - 1) + '</u>, ' + current;
+  } else {
+    for (i = 1; i < current; i++) { s += '<u>' + i + '</u>, '; }
+    s += current;
+  }
+  if (endPage - current > 5) {
+    s += ', <u>' + (current + 1) + '</u>, <u>' + (current + 2) + '</u> ... <u>' + (endPage - 2) + '</u>, <u>' + (endPage - 1) + '</u>, <u>' + endPage + '</u>';
+  } else {
+    for (i = current + 1; i <= endPage; i++) { s += ', <u>' + i + '</u>'; }
+  }
+  return s;
+}
+
+function classicReference(snap) {
+  var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+  var name = function (u) { return u ? u.name : 'Placeholder_User'; };
+  var words = { 10: 'Ten', 15: 'Fifteen', 20: 'Twenty', 25: 'Twenty-five', 2: 'Two' };
+  // The first paragraph of the post runs on in the same paragraph.
+  var post = function (lead, content) {
+    var body = bbcodeToHtml(content || '', 'ao3', { lineBreaks: true });
+    var m = /^<p>([\s\S]*?)<\/p>\n?/.exec(body);
+    return m ? '<p>' + lead + m[1] + '</p>\n' + body.slice(m[0].length) : '<p>' + lead.replace(/<br \/>$|\s$/, '') + '</p>\n' + body;
+  };
+  var tags = function (u, isOp) {
+    return (isOp ? ' (Original Poster)' : '') + ((u && u.tags) || []).map(function (t) { return ' (' + esc(t.name) + ')'; }).join('');
+  };
+  var out = ['<p align="center">■</p>',
+    '<p><strong>Welcome to the Parahumans Online message boards.</strong><br />' +
+    'You are currently logged in, <u>' + esc(name(snap.perspective)) + '</u><br />You are viewing:<br />' +
+    ['Threads you have replied to', 'AND Threads that have new replies', 'OR private message conversations with new replies',
+      'Thread OP is displayed.', words[snap.postsPerPage] + ' posts per page', 'Last ten messages in private message history.',
+      'Threads and private messages are ordered chronologically.'].map(function (l) { return '• ' + l; }).join('<br />') + '</p>',
+    '<p align="center">■</p>'];
+  snap.threads.forEach(function (thread) {
+    var op = thread.op;
+    if (thread.isPrivate) {
+      out.push('<p><strong>♦ Private Message ' + esc(pmHeadline(thread, snap.perspective)) + '</strong><br /><strong>Subject:</strong> ' + esc(thread.name) + '</p>');
+      [op].concat(thread.replies).forEach(function (p) {
+        out.push(post('<strong>' + esc(name(p.user)) + ':</strong> ', p.content));
+      });
+    } else {
+      out.push(post('<strong>♦ Topic: ' + esc(thread.name) + '</strong><br /><strong>In: ' +
+        ['Boards'].concat(thread.location.split('►').map(function (s) { return s.trim(); })).map(esc).join(' ► ') + '</strong><br />' +
+        '<strong>' + esc(name(op.user)) + ' </strong>' + tags(op.user, true) + '<br />Posted On ' + op.classicDate + ':<br />', op.content));
+      var sp = thread.startPage, pp = snap.postsPerPage, n = thread.replies.length;
+      thread.replies.forEach(function (p, i) {
+        var offset = sp === 1 ? 1 : 0;
+        if (i === 0 || (sp === 1 ? (i + 1) % pp === 0 : i % pp === 0)) {
+          out.push('<p><strong>(Showing page ' + Math.floor((i + offset) / pp + sp) + ' of ' + thread.endPage + ')</strong></p>');
+          out.push('<dl>');
+        }
+        out.push('<dd>');
+        out.push(post('<strong>►' + esc(name(p.user)) + ' </strong>' + tags(p.user, p.user && op.user && p.user.id === op.user.id) +
+          '<br />Replied On ' + p.classicDate + ':<br />', p.content));
+        out.push('</dd>');
+        if (i === n - 1 || (sp === 1 ? (i + 2) % pp === 0 : (i + 1) % pp === 0)) {
+          out.push('</dl>');
+          out.push('<p><strong>End of Page.&nbsp;&nbsp;&nbsp;' + classicPageString(i, sp, thread.endPage, pp) + '</strong></p>');
+        }
+      });
+    }
+    out.push('<p align="center">■</p>');
+  });
+  // Classes and wrapper divs don't show without the skin either.
+  return hiddenView(out.join('\n'));
+}
+
+// What AO3 renders once the work skin is gone: text the skin hides is back,
+// and spans, classes and wrapper divs make no difference.
+function hiddenView(html) {
+  var prev;
+  do { prev = html; html = html.replace(/<span[^>]*><\/span>/g, ''); } while (html !== prev);
+  html = html.replace(/<\/?span[^>]*>/g, '').replace(/ class="[^"]*"/g, '').replace(/<\/?div>/g, '');
+  return normalizeHtml(html);
+}
+
+// Whitespace the browser collapses, and one block per line.
+function normalizeHtml(html) {
+  return html.replace(/[ \t]+/g, ' ')
+    .replace(/\s*(<br \/>)\s*/g, '$1')
+    .replace(/\s*(<\/?(?:p|blockquote|ul|ol|li|dl|dd|div|table|tr|td|th|pre|h\d)\b[^>]*>)\s*/g, '\n$1\n')
+    .split('\n').map(function (l) { return l.trim(); }).filter(Boolean).join('\n');
+}
+
+function classicSnapshot() {
+  var snap = snapshot(13, { postsPerPage: 10 });
+  var t = snap.threads[0];
+  t.endPage = 2;
+  t.op.classicDate = 'Jan 1st 2011';
+  t.op.content = 'First post\nsecond line\n\n[b]bold[/b] & <things>\n[quote="Tin"]Quoted[/quote]\nAfter the quote';
+  t.replies.forEach(function (p) { p.classicDate = 'Jan 2nd 2011'; });
+  t.replies[2].content = '[quote]Starts with a quote[/quote]\nThen text';
+  t.replies[4].content = '';
+  t.replies[5].content = 'A list:\n[list][*]one[*]two[/list]';
+  snap.threads.push(conversation(bagrat, [tin]));
+  snap.threads[1].replies[0].content = 'Two\n\nparagraphs';
+  return snap;
+}
+
+test('AO3 with the creator\'s style hidden is exactly Classic PHO', function () {
+  var snap = classicSnapshot();
+  var got = hiddenView(ao3Html(snap, { bbToHtml: bbcodeToHtml })).split('\n');
+  var want = classicReference(snap).split('\n');
+  want.forEach(function (line, i) { assert.equal(got[i], line, 'line ' + (i + 1)); });
+  assert.equal(got.length, want.length);
+});
+
+test('AO3 hidden view: a long thread starting past page 1, and another forum name', function () {
+  var snap = snapshot(25, { postsPerPage: 10, forumName: 'Spacebattles' });
+  var t = snap.threads[0];
+  t.startPage = 7; t.endPage = 20;
+  t.op.classicDate = 'Jan 1st 2011';
+  t.replies.forEach(function (p) { p.classicDate = 'Jan 2nd 2011'; });
+  var got = hiddenView(ao3Html(snap, { bbToHtml: bbcodeToHtml }));
+  assert.equal(got, classicReference(snap));
+  assert.ok(got.includes('End of Page.&nbsp;&nbsp;&nbsp;<u>1</u>, <u>2</u>, <u>3</u> ... <u>5</u>, <u>6</u>, 7, <u>8</u>, <u>9</u> ... <u>18</u>, <u>19</u>, <u>20</u>'));
+  // The other forum name only shows with the skin.
+  assert.ok(ao3Html(snap).includes('<span class="fm-x">Parahumans Online</span><span class="fm-fname"><span class="fm-g-us"></span>'));
+});
+
+// AO3 rewrites chapter HTML on save (lib/paragraph_maker.rb in otwarchive):
+// text or inline tags directly inside a div or blockquote get a new <p>, and
+// block tags inside a <p> split it. Either would change the hidden view, so
+// the output must give it nothing to do.
+var AO3_BLOCKS = /^(p|div|blockquote|ul|ol|li|table|thead|tbody|tr|td|th|pre|h[1-6]|hr|dl|dt|dd|details|summary|center)$/;
+var AO3_CONTAINERS = /^(div|blockquote|ul|ol|table|thead|tbody|tr|dl|dd|details)$/;
+
+function ao3Rewrites(html) {
+  var stack = ['#root'];
+  var problems = [];
+  var re = /<(\/?)([a-z0-9]+)\b[^>]*?(\/?)>|([^<]+)/gi;
+  var m;
+  while ((m = re.exec(html))) {
+    var parent = stack[stack.length - 1];
+    if (m[4] !== undefined) {
+      if (m[4].trim() && (AO3_CONTAINERS.test(parent) || parent === '#root')) { problems.push('text in <' + parent + '>: ' + m[4].trim()); }
+      if (/\n/.test(m[4]) && !(AO3_CONTAINERS.test(parent) || parent === '#root' || parent === 'pre')) { problems.push('newline inside <' + parent + '>'); }
+      continue;
+    }
+    var tag = m[2].toLowerCase();
+    if (m[1]) { stack.pop(); continue; }
+    var block = AO3_BLOCKS.test(tag);
+    if (!block && (AO3_CONTAINERS.test(parent) || parent === '#root')) { problems.push('<' + tag + '> directly in <' + parent + '>'); }
+    if (block && stack.some(function (t) { return t === 'p' || !AO3_BLOCKS.test(t) && t !== '#root'; })) {
+      problems.push('<' + tag + '> inside <' + stack.join('>') + '>');
+    }
+    if (!m[3] && tag !== 'br' && tag !== 'img' && tag !== 'hr') { stack.push(tag); }
+  }
+  return problems;
+}
+
+test('AO3 has nothing to rewrite in the chapter HTML', function () {
+  var snap = classicSnapshot();
+  snap.threads[0].replies[6].content = '[spoiler=Wild]Hidden[/spoiler]\n[code]x = 1[/code]\n[table][tr][td]a[/td][/tr][/table]\n[heading=2]Head[/heading]\n[center]mid[/center]\n[indent]in[/indent]\n[hr][/hr]\nend';
+  assert.deepEqual(ao3Rewrites(ao3Html(snap, { bbToHtml: bbcodeToHtml })), []);
+  assert.deepEqual(ao3Rewrites('<div>loose</div><p><div>x</div></p>'), ['text in <div>: loose', '<div> inside <#root>p>', 'text in <div>: x']);
 });

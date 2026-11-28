@@ -72,15 +72,22 @@ changes the in-app preview. The preview is an approximation.
 You get a header bar with nav tabs, a notice box, breadcrumbs, page navigation,
 avatars, staff/verified/banned banners, quotes, spoilers, lists and code blocks.
 There are eight themes: Midnight, Graphite, Blackened Green, Ocean, Violet,
-Crimson, Ember and Daylight. The layout wraps with flexbox (allowed in skins
-since 2024): it shows a sidebar on desktop and the user strip above each post
-on phones.
+Crimson, Ember and Daylight. Each post has a narrow user column on the left,
+on phones too (AO3 skins can't use media queries or grid).
 
 With *Hide Creator's Style* turned on, and in AO3's downloads (which leave work
-skins out), the chapter reads exactly like Classic PHO. The chapter HTML *is*
-the Classic transcript, and the work skin rebuilds the forum from it:
+skins out), the chapter is Classic PHO. The chapter HTML is Classic's own
+markup (the same paragraphs, `<br />` line breaks, bold and underline), and the
+work skin rebuilds the forum from it:
+- AO3 rewrites chapter HTML when you save it: text sitting straight in a
+  `<div>` gets its own paragraph, which adds gaps Classic doesn't have. So
+  every line is inside a `<p>` and AO3 has nothing to change.
 - Classic-only text ("Posted On", "►", the brackets around user titles,
-  "End of Page.") sits in `fm-x` spans that the skin hides.
+  "End of Page.") and its line breaks sit in `fm-x` spans and `fm-br` breaks
+  that the skin hides.
+- Classic indents the replies; on AO3 each reply is a `<dd>`, the one indent
+  AO3 gives without a line beside it. It indents 3em (about 45px) where the
+  Classic preview indents 30px, and that's the only visible difference.
 - Forum-only text comes from the skin's `::before` rules, so it isn't there
   without the skin. AO3 only allows a fixed quoted string in `content`, so
   per-user text (avatar letters, post numbers, the forum name in the logo) is
