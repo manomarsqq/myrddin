@@ -79,7 +79,7 @@ export default Ember.Component.extend({
 			} else {
 				displayString += ", <u>"+(currentPage+1)+"</u>, <u>"+(currentPage+2)+"</u> ... <u>"+(endPage-2)+"</u>, <u>"+(endPage-1)+"</u>, <u>"+endPage+"</u>";
 			}
-		} else if (currentPage+1 < endPage) {
+		} else if (currentPage+1 <= endPage) {
 			if (isOutput) {
 				for (i=currentPage+1; i<=endPage; i++) {
 					displayString += ", [u]"+i+"[/u]";

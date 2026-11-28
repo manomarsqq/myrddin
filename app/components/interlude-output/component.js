@@ -27,11 +27,19 @@ function forumDate(value) {
   return date.isValid() ? date.format('MMM D, YYYY') : value;
 }
 
+// The date as Classic PHO prints it, which the AO3 output uses.
+function classicDate(value) {
+  if (!value) { return ''; }
+  var date = moment(value, 'MM/DD/YYYY');
+  return date.isValid() ? date.format('MMM Do YYYY') : value;
+}
+
 function plainPost(post) {
-  if (!post) { return { user: null, date: '', content: '' }; }
+  if (!post) { return { user: null, date: '', classicDate: '', content: '' }; }
   return {
     user: plainUser(post.get('user')),
     date: forumDate(post.get('postedOn')),
+    classicDate: classicDate(post.get('postedOn')),
     content: post.get('content') || ''
   };
 }
@@ -52,6 +60,8 @@ export default Ember.Component.extend({
   doc: null,
   showOutput: true,
   copied: null,
+  // Preview the AO3 output the way readers with "Hide Creator's Style" see it.
+  hideSkin: false,
 
   format: Ember.computed.alias('doc.outputFormat'),
   isAo3: Ember.computed.equal('doc.outputFormat', 'ao3'),
@@ -76,6 +86,7 @@ export default Ember.Component.extend({
         return {
           name: thread.get('name'),
           location: thread.get('location'),
+          isPrivate: thread.get('kind') === 'pm',
           startPage: thread.get('startPage'),
           endPage: thread.get('endPage'),
           op: plainPost(thread.get('firstPost')),
@@ -107,8 +118,9 @@ export default Ember.Component.extend({
 
   // Both previews' theme colours: the AO3 work skin (scoped the way AO3 scopes
   // it) and the XenForo preview palette.
-  previewCss: Ember.computed('workSkin', 'theme', function() {
-    return scopeCss(this.get('workSkin'), '.ao3-preview #workskin') + '\n' + xfPreviewCss(this.get('theme'));
+  previewCss: Ember.computed('workSkin', 'theme', 'hideSkin', function() {
+    var skin = this.get('hideSkin') ? '' : scopeCss(this.get('workSkin'), '.ao3-preview #workskin') + '\n';
+    return skin + xfPreviewCss(this.get('theme'));
   }),
 
   updatePreviewSkin: Ember.on('didInsertElement', Ember.observer('previewCss', function() {
@@ -140,6 +152,10 @@ export default Ember.Component.extend({
   },
 
   actions: {
+    toggleSkin: function() {
+      this.toggleProperty('hideSkin');
+    },
+
     copyText: function(id) {
       if (!this.selectElement(id)) { return; }
       var ok = false;

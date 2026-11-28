@@ -12,6 +12,10 @@ A PHO interlude generating wizard written with Ember.js!
 - Output/Preview basic layout of the interlude.
 - Automatically saves onto the local device as you edit.
 - Support multiple threads.
+- Private message conversations (**Add Private Message**). They sit in the
+  same list as threads, so they come out in the order you add them: a
+  "♦ Private Message from …" block in Classic PHO and in AO3 with the skin
+  hidden, an inbox conversation in Forum BBCode and styled AO3.
 - Reorder posts by drag and drop.
 - Post date based on previous posts.
 - Support multiple pages.
@@ -68,13 +72,26 @@ changes the in-app preview. The preview is an approximation.
 You get a header bar with nav tabs, a notice box, breadcrumbs, page navigation,
 avatars, staff/verified/banned banners, quotes, spoilers, lists and code blocks.
 There are eight themes: Midnight, Graphite, Blackened Green, Ocean, Violet,
-Crimson, Ember and Daylight. Identicon and Cartoon avatars are DiceBear images;
-Initials and Text are drawn by the work skin itself. AO3 strips
-`style` attributes and doesn't allow media queries in work skins, so everything
-is done with classes. The layout wraps with flexbox (allowed in skins since
-2024): it shows a sidebar on desktop and the user strip above each post on
-phones. With *Hide Creator's Style* turned on, it still reads as a plain
-transcript.
+Crimson, Ember and Daylight. The layout wraps with flexbox (allowed in skins
+since 2024): it shows a sidebar on desktop and the user strip above each post
+on phones.
+
+With *Hide Creator's Style* turned on, and in AO3's downloads (which leave work
+skins out), the chapter reads exactly like Classic PHO. The chapter HTML *is*
+the Classic transcript, and the work skin rebuilds the forum from it:
+- Classic-only text ("Posted On", "►", the brackets around user titles,
+  "End of Page.") sits in `fm-x` spans that the skin hides.
+- Forum-only text comes from the skin's `::before` rules, so it isn't there
+  without the skin. AO3 only allows a fixed quoted string in `content`, so
+  per-user text (avatar letters, post numbers, the forum name in the logo) is
+  spelled out with empty spans, one class per character. One skin works for
+  every interlude.
+- AO3 avatars are always coloured letters. Image avatars would show up with
+  the skin hidden, and AO3 skins can't load DiceBear's URLs.
+- Private messages leave out per-message dates and user titles, which Classic
+  doesn't print for them either.
+
+The preview's **Hide creator's style** button shows what those readers see.
 
 Post bodies can use BBCode in all formats. The forum formats convert it.
 

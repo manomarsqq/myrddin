@@ -196,11 +196,13 @@ export default Ember.Route.extend({
       });
     },
 
-    createThread: function(doc) {
+    createThread: function(doc, kind) {
 
       var store = this.store;
+      var isPrivate = kind === 'pm';
       var thread = store.createRecord('thread', {
-        name:'A New Thread',
+        name: isPrivate ? 'A New Conversation' : 'A New Thread',
+        kind: isPrivate ? 'pm' : 'thread',
         location: ''
       });
 
@@ -228,7 +230,7 @@ export default Ember.Route.extend({
             'hitType': 'event',
             'eventCategory': 'button',
             'eventAction': 'click',
-            'eventLabel': 'create thread',
+            'eventLabel': isPrivate ? 'create private message' : 'create thread',
           });
         }
       });

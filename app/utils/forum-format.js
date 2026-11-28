@@ -5,8 +5,10 @@
 // {
 //   title, forumName, postsPerPage,
 //   perspective: user|null,
-//   threads: [{ name, location, startPage, endPage, op: post, replies: [post] }]
+//   threads: [{ name, location, startPage, endPage, isPrivate, op: post, replies: [post] }]
 // }
+// A thread with isPrivate set is a private message conversation: name is its
+// subject, op is the first message, and location and pages are ignored.
 // user = { id, name, tags: [{ id, name }] }
 // post = { user: user|null, date: 'Jan 1, 2011', content: 'raw BBCode' }
 
@@ -145,6 +147,37 @@ function bannerColor(tagName) {
   if (kind === 'mod') { return '#d64545'; }
   if (kind === 'verified') { return '#3a8fd6'; }
   return BB_PALETTE[hashString(tagName) % BB_PALETTE.length];
+}
+
+// Everyone in a private conversation, in the order they first wrote, then
+// the inbox owner if they haven't written yet.
+export function pmParticipants(thread, perspective) {
+  var people = [];
+  var add = function (user) {
+    if (!user) { return; }
+    for (var i = 0; i < people.length; i++) {
+      if (sameUser(people[i], user)) { return; }
+    }
+    people.push(user);
+  };
+  add(thread.op && thread.op.user);
+  (thread.replies || []).forEach(function (post) { add(post.user); });
+  add(perspective);
+  return people;
+}
+
+// "from Bagrat", or "to Bagrat, Weld" when the inbox owner started it.
+export function pmHeadline(thread, perspective) {
+  var opener = thread.op && thread.op.user;
+  if (opener && sameUser(opener, perspective)) {
+    var others = pmParticipants(thread, null).filter(function (user) {
+      return !sameUser(user, perspective);
+    });
+    if (others.length) {
+      return 'to ' + others.map(userName).join(', ');
+    }
+  }
+  return 'from ' + userName(opener);
 }
 
 function locationParts(location) {
@@ -332,7 +365,7 @@ function bbTags(user, op) {
 function bbPostRows(entry, thread, options) {
   var post = entry.post;
   var name = userName(post.user);
-  var isOp = sameUser(post.user, thread.op && thread.op.user);
+  var isOp = !thread.isPrivate && sameUser(post.user, thread.op && thread.op.user);
   var content = String(post.content || '').replace(/\s+$/, '');
   var tags = bbTags(post.user, isOp);
   var out = [];
@@ -370,6 +403,26 @@ function bbPostTable(entries, thread, options) {
   return ['[TABLE]'].concat(rows, ['[/TABLE]']).join('\n');
 }
 
+// Every message of a conversation in one table, numbered from 1, with no
+// pages: XenForo conversations rarely run past one page.
+function conversationEntries(thread) {
+  return [thread.op || {}].concat(thread.replies || []).map(function (post, i) {
+    return { post: post, number: i + 1 };
+  });
+}
+
+function bbConversation(thread, snapshot, opts) {
+  var opener = thread.op && thread.op.user;
+  var people = pmParticipants(thread, snapshot.perspective).map(userName);
+  return [
+    bbMuted('Inbox ► Conversations'),
+    '[HEADING=2]✉ ' + (thread.name || '') + '[/HEADING]',
+    bbMuted('Private conversation started by ' + userName(opener) + ', ' + ((thread.op && thread.op.date) || '') +
+      '  ·  Participants: ' + people.join(', ')),
+    bbPostTable(conversationEntries(thread), thread, opts)
+  ];
+}
+
 export function forumBBCode(snapshot, options) {
   options = options || {};
   var opts = {
@@ -402,6 +455,10 @@ export function forumBBCode(snapshot, options) {
       out.push('[HR][/HR]');
     }
     out.push('');
+    if (thread.isPrivate) {
+      out.push.apply(out, bbConversation(thread, snapshot, opts));
+      return;
+    }
     out.push(bbMuted('Forums ► Boards' + (parts.length ? ' ► ' + parts.join(' ► ') : '')));
     out.push('[HEADING=2]' + (thread.name || '') + '[/HEADING]');
     out.push(bbMuted('Discussion' + (parts.length ? " in '" + parts[parts.length - 1] + "'" : '') +
@@ -432,70 +489,179 @@ export function forumBBCode(snapshot, options) {
 // ---------------------------------------------------------------------------
 // AO3 chapter HTML + work skin.
 //
-// AO3 rules this respects: no `style` attributes (all looks come from `fm-`
-// classes in the work skin), no media queries (the layout wraps with flexbox
-// instead, which AO3 has allowed since 2024), each block element on its own
-// line and no newlines between inline elements so AO3's paragraph pass
-// doesn't add stray <br /> tags. With "Hide Creator's Style" on, the markup
-// still reads as a plain transcript.
+// The HTML is the Classic PHO transcript, line for line, so a reader with
+// "Hide Creator's Style" on, or anyone reading an AO3 download (downloads
+// leave work skins out), sees the classic layout. The work skin then rebuilds
+// the forum from that same markup:
+//   - `fm-x` spans hold classic-only text ("Posted On", "►", brackets) and the
+//     skin hides them
+//   - forum-only text comes from the skin's ::before rules, so it isn't there
+//     without the skin. AO3 only allows a fixed string in `content` (no
+//     attr(), no counter()), so per-user text such as avatar letters, post
+//     numbers and the forum name is spelled out with empty spans, one class
+//     per character (see glyphs()). That keeps one skin good for any interlude.
+//   - wrapper divs and spans with no text of their own are invisible unstyled
+//
+// AO3 rules this respects: no `style` attributes (`align` is allowed, and is
+// how the ■ lines are centred), no media queries (the layout wraps with
+// flexbox), each block element on its own line and no newlines between
+// inline elements, so AO3's paragraph pass doesn't add stray <br /> tags.
 
-function htmlPageNav(page, total) {
-  var parts = ['<span class="fm-pagelabel">Page ' + page + ' of ' + total + '</span>'];
-  if (page > 1) { parts.push('<span class="fm-pg">‹ Prev</span>'); }
-  pageList(page, total).forEach(function (p) {
-    if (p === '…') {
-      parts.push('<span class="fm-pg-gap">…</span>');
-    } else {
-      parts.push('<span class="fm-pg' + (p === page ? ' fm-pg-on' : '') + '">' + p + '</span>');
-    }
-  });
-  if (page < total) { parts.push('<span class="fm-pg">Next ›</span>'); }
-  return '<div class="fm-pagenav">' + parts.join(' ') + '</div>';
+var GLYPH_PUNCT = {
+  ' ': 'sp', '_': 'us', '-': 'hy', '.': 'dt', '\'': 'ap', '!': 'ex', '?': 'qm', '&': 'am',
+  ':': 'co', ',': 'cm', '(': 'lp', ')': 'rp', '#': 'hs', '@': 'at', '/': 'sl', '+': 'pl'
+};
+
+// Lower-case class names only, in case anything on the way normalises case.
+function glyphClass(ch) {
+  if (/[a-z0-9]/.test(ch)) { return 'fm-g-' + ch; }
+  if (/[A-Z]/.test(ch)) { return 'fm-g-u' + ch.toLowerCase(); }
+  return GLYPH_PUNCT[ch] ? 'fm-g-' + GLYPH_PUNCT[ch] : null;
 }
 
-function htmlPost(entry, thread, bbToHtml, options) {
-  var post = entry.post;
-  var name = userName(post.user);
-  var isOp = sameUser(post.user, thread.op && thread.op.user);
-  var lines = [];
-  var banners = [];
+// Text that only the work skin shows. Characters without a glyph are dropped.
+export function glyphs(text) {
+  return String(text === null || text === undefined ? '' : text).split('').map(function (ch) {
+    var cls = glyphClass(ch);
+    return cls ? '<span class="' + cls + '"></span>' : '';
+  }).join('');
+}
 
-  if (isOp) {
-    banners.push('<div class="fm-banner fm-bn-op">Original Poster</div>');
+// Classic-only text, hidden by the work skin. `html` must already be escaped.
+function classicOnly(html) {
+  return '<span class="fm-x">' + html + '</span>';
+}
+
+// Mirrors the thread-page-footer component: "1, 2, 3 ... 6, 7, 8 ... 18, 19, 20".
+export function classicPageList(page, total) {
+  var items = [];
+  var i;
+  if (page - 1 > 5) {
+    items.push(1, 2, 3, '...', page - 2, page - 1, page);
+  } else {
+    for (i = 1; i <= page; i++) { items.push(i); }
   }
-  ((post.user && post.user.tags) || []).forEach(function (tag) {
+  if (total - page > 5) {
+    items.push(page + 1, page + 2, '...', total - 2, total - 1, total);
+  } else {
+    for (i = page + 1; i <= total; i++) { items.push(i); }
+  }
+  return items;
+}
+
+function htmlPageHead(page, total) {
+  return '<p class="fm-pagehead"><strong>' + classicOnly('(Showing ') +
+    '<span class="fm-pagelabel">page ' + page + ' of ' + total + '</span>' + classicOnly(')') + '</strong></p>';
+}
+
+function htmlPageEnd(page, total) {
+  var parts = [];
+  var items = classicPageList(page, total);
+  items.forEach(function (item, i) {
+    if (item === '...') {
+      parts.push('<span class="fm-pg-gap"> ... </span>');
+      return;
+    }
+    if (i > 0 && items[i - 1] !== '...') {
+      parts.push(classicOnly(', '));
+    }
+    parts.push(item === page ? '<span class="fm-pg fm-pg-on">' + item + '</span>' : '<u class="fm-pg">' + item + '</u>');
+  });
+  return '<p class="fm-pagenav"><strong>' + classicOnly('End of Page.&nbsp;&nbsp;&nbsp;') +
+    (page > 1 ? '<span class="fm-pg fm-prev"></span>' : '') + parts.join('') +
+    (page < total ? '<span class="fm-pg fm-next"></span>' : '') + '</strong></p>';
+}
+
+function htmlBanners(user, isOp) {
+  var banners = [];
+  if (isOp) {
+    banners.push('<span class="fm-banner fm-bn-op">' + classicOnly('(') + 'Original Poster' + classicOnly(')') + '</span>');
+  }
+  ((user && user.tags) || []).forEach(function (tag) {
     var kind = bannerKind(tag.name);
     var cls = kind ? 'fm-bn-' + kind : 'fm-bn' + (hashString(tag.name) % BB_PALETTE.length);
-    banners.push('<div class="fm-banner ' + cls + '">' + escapeHtml(tag.name) + '</div>');
+    banners.push('<span class="fm-banner ' + cls + '">' + classicOnly('(') + escapeHtml(tag.name) + classicOnly(')') + '</span>');
+  });
+  return banners;
+}
+
+// One post. Unstyled it reads like Classic PHO:
+//   ►Bagrat (Original Poster) (Veteran Member)
+//   Replied On Jan 2nd 2011:
+//   ...content...
+// Private messages read "Bagrat:" followed by the message.
+function htmlPost(post, o, bbToHtml) {
+  var name = userName(post.user);
+  var nameHtml = '<strong class="fm-name">' + (o.reply ? classicOnly('►') : '') + escapeHtml(name) +
+    (o.pm ? classicOnly(':') : '') + '</strong>';
+  var ident = [nameHtml].concat(o.pm ? [] : htmlBanners(post.user, o.isOp)).join(' ');
+  var date = o.pm ? '' : classicOnly(o.label + ' ') +
+    '<span class="fm-date">' + escapeHtml(post.classicDate || post.date || '') + '</span>' + classicOnly(':');
+  var body = bbToHtml ? bbToHtml(post.content || '', 'ao3') : escapeHtml(post.content || '');
+
+  return [
+    '<div class="fm-post">',
+    '<div class="fm-user"><span class="fm-avatar fm-av' + avatarIndex(name) + '">' + glyphs(initial(name)) + '</span>' +
+      '<span class="fm-ident">' + ident + '</span></div>',
+    '<div class="fm-main">',
+    '<div class="fm-attr">' + date + '<span class="fm-num">' + glyphs(o.number) + '</span></div>',
+    '<div class="fm-body">',
+    body,
+    '</div>',
+    '<div class="fm-actions"></div>',
+    '</div>',
+    '</div>'
+  ].filter(function (line) { return line !== ''; }).join('\n');
+}
+
+function htmlThread(thread, snapshot, bbToHtml) {
+  var info = threadLayout(thread, snapshot.postsPerPage);
+  var op = thread.op || {};
+  var crumbs = ['Boards'].concat(locationParts(thread.location)).map(escapeHtml).join('<span class="fm-sep"> ► </span>');
+  var out = [];
+
+  out.push('<div class="fm-thread">');
+  out.push('<div class="fm-thead">');
+  out.push('<div class="fm-title"><strong>' + classicOnly('♦&nbsp; Topic: ') + escapeHtml(thread.name || '') + '</strong></div>');
+  out.push('<div class="fm-crumbs"><strong>' + classicOnly('In:&nbsp; ') + crumbs + '</strong></div>');
+  out.push('</div>');
+  out.push(htmlPost(op, { isOp: !!op.user, label: 'Posted On', number: 1 }, bbToHtml));
+
+  info.pages.forEach(function (page) {
+    out.push(htmlPageHead(page.page, info.endPage));
+    out.push('<blockquote class="fm-replies">');
+    page.posts.forEach(function (entry) {
+      out.push(htmlPost(entry.post, {
+        reply: true,
+        isOp: sameUser(entry.post.user, op.user),
+        label: 'Replied On',
+        number: entry.number
+      }, bbToHtml));
+    });
+    out.push('</blockquote>');
+    out.push(htmlPageEnd(page.page, info.endPage));
   });
 
-  var body = bbToHtml ? bbToHtml(post.content || '', 'ao3') : escapeHtml(post.content || '');
-  if (!body) {
-    body = '<p>&nbsp;</p>';
-  }
+  out.push('<p class="fm-sq" align="center">■</p>');
+  out.push('</div>');
+  return out.join('\n');
+}
 
-  lines.push('<div class="fm-post">');
-  lines.push('<div class="fm-user">');
-  var style = avatarStyle(options.avatars);
-  if (style === 'identicon' || style === 'thumbs') {
-    lines.push('<div class="fm-avatar fm-avatar-pic"><img src="' + escapeHtml(avatarUrl(name, style)) + '" alt="" /></div>');
-  } else {
-    lines.push('<div class="fm-avatar fm-av' + avatarIndex(name) + '">' + escapeHtml(initial(name)) + '</div>');
-  }
-  lines.push('<div class="fm-ident">');
-  lines.push('<div class="fm-name">' + escapeHtml(name) + '</div>');
-  lines.push.apply(lines, banners);
-  lines.push('</div>');
-  lines.push('</div>');
-  lines.push('<div class="fm-main">');
-  lines.push('<div class="fm-attr"><span class="fm-date">' + escapeHtml(post.date || '') + '</span> <span class="fm-num">#' + entry.number + '</span></div>');
-  lines.push('<div class="fm-body">');
-  lines.push(body);
-  lines.push('</div>');
-  lines.push('<div class="fm-actions"><span>Report</span> <span>Like</span> <span>Quote</span> <span>Reply</span></div>');
-  lines.push('</div>');
-  lines.push('</div>');
-  return lines.join('\n');
+function htmlConversation(thread, snapshot, bbToHtml) {
+  var out = [];
+  out.push('<div class="fm-thread fm-pm">');
+  out.push('<div class="fm-thead">');
+  out.push('<div class="fm-pmfrom"><strong>' + classicOnly('♦&nbsp; ') + 'Private Message ' +
+    escapeHtml(pmHeadline(thread, snapshot.perspective)) + '</strong></div>');
+  out.push('<div class="fm-title">' + classicOnly('<strong>Subject:</strong> ') + '<span class="fm-pm-tag"></span>' +
+    escapeHtml(thread.name || '') + '</div>');
+  out.push('</div>');
+  conversationEntries(thread).forEach(function (entry) {
+    out.push(htmlPost(entry.post, { pm: true, number: entry.number }, bbToHtml));
+  });
+  out.push('<p class="fm-sq" align="center">■</p>');
+  out.push('</div>');
+  return out.join('\n');
 }
 
 export function ao3Html(snapshot, options) {
@@ -505,45 +671,24 @@ export function ao3Html(snapshot, options) {
   var out = [];
 
   out.push('<div class="fm-forum">');
-  out.push('<div class="fm-header">');
-  out.push('<div class="fm-logo">' + escapeHtml(forumName) + '</div>');
-  out.push('<div class="fm-navrow"><span class="fm-tab fm-tab-on">Forums</span> <span class="fm-tab">What\'s new</span> <span class="fm-tab">Members</span> <span class="fm-tab fm-tab-user">' + escapeHtml(userName(snapshot.perspective)) + '</span></div>');
-  out.push('</div>');
-
+  out.push('<div class="fm-header"><span class="fm-logo">' + glyphs(forumName) + '</span>' +
+    '<span class="fm-navrow"><span class="fm-tab fm-tab-on fm-tab-forums"></span><span class="fm-tab fm-tab-new"></span>' +
+    '<span class="fm-tab fm-tab-members"></span></span></div>');
+  out.push('<p class="fm-sq" align="center">■</p>');
   out.push('<div class="fm-notice">');
-  out.push('<p><strong>Welcome to the ' + escapeHtml(forumName) + ' message boards.</strong><br />You are currently logged in, <u>' + escapeHtml(userName(snapshot.perspective)) + '</u></p>');
-  out.push('<ul class="fm-viewing">' + viewingLines(snapshot).map(function (l) { return '<li>' + escapeHtml(l) + '</li>'; }).join('') + '</ul>');
+  out.push('<div class="fm-welcome"><strong>Welcome to the ' + escapeHtml(forumName) + ' message boards.</strong></div>');
+  out.push('<div>You are currently logged in, <u>' + escapeHtml(userName(snapshot.perspective)) + '</u></div>');
+  out.push('<div class="fm-x">You are viewing:</div>');
+  out.push('<div class="fm-viewing">');
+  viewingLines(snapshot).forEach(function (line) {
+    out.push('<div class="fm-vl">' + classicOnly('•&nbsp; ') + escapeHtml(line) + '</div>');
+  });
   out.push('</div>');
+  out.push('</div>');
+  out.push('<p class="fm-sq" align="center">■</p>');
 
   (snapshot.threads || []).forEach(function (thread) {
-    var info = threadLayout(thread, snapshot.postsPerPage);
-    var parts = locationParts(thread.location);
-    var opName = userName(thread.op && thread.op.user);
-    var crumbs = ['Forums', 'Boards'].concat(parts).map(escapeHtml).join(' <span class="fm-sep">›</span> ');
-
-    out.push('<div class="fm-thread">');
-    out.push('<div class="fm-crumbs">' + crumbs + '</div>');
-    out.push('<h3 class="fm-title">' + escapeHtml(thread.name || '') + '</h3>');
-    out.push('<div class="fm-meta">Discussion' + (parts.length ? ' in ‘' + escapeHtml(parts[parts.length - 1]) + '’' : '') +
-      ' started by <strong>' + escapeHtml(opName) + '</strong>, ' + escapeHtml((thread.op && thread.op.date) || '') + '</div>');
-
-    if (info.opOnFirstPage) {
-      out.push(htmlPageNav(1, info.endPage));
-    }
-    out.push(htmlPost({ post: thread.op || {}, number: 1 }, thread, bbToHtml, options));
-
-    info.pages.forEach(function (page, i) {
-      if (!(info.opOnFirstPage && i === 0)) {
-        out.push(htmlPageNav(page.page, info.endPage));
-      }
-      page.posts.forEach(function (entry) {
-        out.push(htmlPost(entry, thread, bbToHtml, options));
-      });
-    });
-
-    var lastPage = info.pages.length ? info.pages[info.pages.length - 1].page : info.startPage;
-    out.push(htmlPageNav(lastPage, info.endPage));
-    out.push('</div>');
+    out.push(thread.isPrivate ? htmlConversation(thread, snapshot, bbToHtml) : htmlThread(thread, snapshot, bbToHtml));
   });
 
   out.push('</div>');
@@ -564,33 +709,53 @@ export function workSkinCss(themeName) {
     'font-family: ' + sans, 'font-size: 0.95em', 'line-height: 1.5', 'border: 1px solid ' + t.border, 'border-radius: 4px']);
   rule('.fm-forum p', ['margin: 0 0 0.75em']);
   rule('.fm-forum a', ['color: ' + t.accent]);
+  // Classic-only text and the ■ separators.
+  rule('.fm-x, .fm-sq', ['display: none']);
 
-  rule('.fm-header', ['background: ' + t.header, 'color: ' + t.headerText, 'border-bottom: 3px solid ' + t.accent, 'border-radius: 4px 4px 0 0']);
-  rule('.fm-logo', ['padding: 0.6em 0.9em 0.3em', 'font-size: 1.6em', 'font-weight: bold', 'letter-spacing: 0.02em']);
+  rule('.fm-header', ['display: block', 'background: ' + t.header, 'color: ' + t.headerText, 'border-bottom: 3px solid ' + t.accent,
+    'border-radius: 4px 4px 0 0']);
+  rule('.fm-logo', ['display: block', 'padding: 0.6em 0.9em 0.3em', 'font-size: 1.6em', 'font-weight: bold', 'letter-spacing: 0.02em']);
   rule('.fm-navrow', ['display: flex', 'flex-wrap: wrap', 'padding: 0 0.6em', 'background: ' + t.tab]);
   rule('.fm-tab', ['padding: 0.45em 0.8em', 'font-size: 0.9em', 'color: ' + t.headerText]);
   rule('.fm-tab-on', ['background: ' + t.accent, 'color: ' + t.accentText, 'font-weight: bold']);
-  rule('.fm-tab-user', ['margin-left: auto', 'font-weight: bold']);
+  rule('.fm-tab-forums:before', ['content: "Forums"']);
+  rule('.fm-tab-new:before', ['content: "What\'s new"']);
+  rule('.fm-tab-members:before', ['content: "Members"']);
 
   rule('.fm-notice', ['margin: 0.75em', 'padding: 0.6em 0.9em', 'background: ' + t.notice, 'border: 1px solid ' + t.border,
     'border-left: 4px solid ' + t.accent, 'border-radius: 3px']);
-  rule('.fm-notice p', ['margin: 0 0 0.3em']);
-  rule('.fm-viewing', ['margin: 0', 'padding: 0', 'list-style: none', 'font-size: 0.8em', 'color: ' + t.muted]);
-  rule('.fm-viewing li', ['display: inline', 'margin: 0 0.9em 0 0']);
+  rule('.fm-viewing', ['margin-top: 0.3em', 'font-size: 0.8em', 'color: ' + t.muted]);
+  rule('.fm-vl', ['display: inline', 'margin: 0 0.9em 0 0']);
 
   rule('.fm-thread', ['margin: 1.25em 0.75em 0.75em']);
-  rule('.fm-crumbs', ['font-size: 0.8em', 'color: ' + t.muted]);
-  rule('.fm-sep', ['padding: 0 0.25em']);
-  rule('.fm-title', ['margin: 0.2em 0 0.1em', 'padding: 0', 'border: none', 'font-family: ' + sans,
-    'font-size: 1.45em', 'font-weight: normal', 'color: ' + t.text, 'text-align: left']);
-  rule('.fm-meta', ['margin-bottom: 0.6em', 'font-size: 0.8em', 'color: ' + t.muted]);
+  rule('.fm-thead', ['display: flex', 'flex-direction: column', 'margin-bottom: 0.6em']);
+  rule('.fm-crumbs, .fm-pmfrom', ['order: -1', 'font-size: 0.8em', 'color: ' + t.muted]);
+  rule('.fm-crumbs strong, .fm-pmfrom strong', ['font-weight: normal']);
+  rule('.fm-crumbs:before', ['content: "Forums ► "']);
+  rule('.fm-pmfrom:before', ['content: "Inbox ► "']);
+  rule('.fm-title', ['margin: 0.2em 0 0', 'font-size: 1.45em', 'line-height: 1.3', 'color: ' + t.text]);
+  rule('.fm-title strong', ['font-weight: normal']);
+  rule('.fm-pm-tag:before', ['content: "Private"']);
+  rule('.fm-pm-tag', ['display: inline-block', 'margin-right: 0.4em', 'padding: 0.1em 0.45em', 'vertical-align: middle',
+    'font-size: 0.55em', 'font-weight: bold', 'letter-spacing: 0.05em', 'text-transform: uppercase',
+    'background: ' + t.accent, 'color: ' + t.accentText, 'border-radius: 3px']);
+  rule('.fm-pm .fm-post', ['border-left: 3px solid ' + t.accent]);
 
-  rule('.fm-pagenav', ['margin: 0.6em 0', 'text-align: right', 'font-size: 0.8em']);
-  rule('.fm-pagelabel', ['margin-right: 0.6em', 'color: ' + t.muted]);
+  // AO3 indents blockquotes; the replies shouldn't be.
+  rule('.fm-replies', ['margin: 0', 'padding: 0', 'border: none', 'font-family: ' + sans, 'font-size: 1em']);
+
+  rule('.fm-forum .fm-pagehead, .fm-forum .fm-pagenav', ['margin: 0.6em 0', 'font-size: 0.8em', 'color: ' + t.muted]);
+  rule('.fm-pagehead strong, .fm-pagenav strong', ['font-weight: normal']);
+  rule('.fm-pagelabel', ['display: inline-block']);
+  rule('.fm-pagelabel:first-letter', ['text-transform: uppercase']);
+  rule('.fm-pagenav', ['text-align: right']);
   rule('.fm-pg', ['display: inline-block', 'min-width: 1.2em', 'margin: 0 0 0.25em 0.2em', 'padding: 0.15em 0.5em',
-    'text-align: center', 'background: ' + t.block, 'border: 1px solid ' + t.border, 'border-radius: 3px', 'color: ' + t.accent]);
+    'text-align: center', 'text-decoration: none', 'background: ' + t.block, 'border: 1px solid ' + t.border,
+    'border-radius: 3px', 'color: ' + t.accent]);
   rule('.fm-pg-on', ['background: ' + t.accent, 'border-color: ' + t.accent, 'color: ' + t.accentText, 'font-weight: bold']);
   rule('.fm-pg-gap', ['margin: 0 0.2em', 'color: ' + t.muted]);
+  rule('.fm-prev:before', ['content: "‹ Prev"']);
+  rule('.fm-next:before', ['content: "Next ›"']);
 
   rule('.fm-post', ['display: flex', 'flex-wrap: wrap', 'margin: 0 0 0.6em', 'background: ' + t.block,
     'border: 1px solid ' + t.border, 'border-radius: 3px']);
@@ -599,20 +764,20 @@ export function workSkinCss(themeName) {
   rule('.fm-user', ['display: flex', 'flex-wrap: wrap', 'flex: 1 0 8.5em', 'min-width: 0', 'justify-content: center', 'align-items: center',
     'align-content: flex-start', 'padding: 0.75em 0.5em', 'background: ' + t.user, 'border-right: 1px solid ' + t.border,
     'text-align: center']);
-  rule('.fm-avatar', ['flex: 0 0 auto', 'width: 2.3em', 'height: 2.3em', 'margin: 0.1em 0.3em 0.3em', 'line-height: 2.3em',
+  rule('.fm-avatar', ['display: block', 'flex: 0 0 auto', 'width: 2.3em', 'height: 2.3em', 'margin: 0.1em 0.3em 0.3em', 'line-height: 2.3em',
     'font-size: 1.9em', 'font-weight: bold', 'text-align: center', 'color: #ffffff', 'border-radius: 4px']);
-  rule('.fm-avatar-pic', ['background: transparent', 'line-height: 0']);
-  rule('.fm-avatar-pic img', ['width: 100%', 'height: 100%', 'margin: 0', 'border-radius: 4px']);
-  rule('.fm-ident', ['flex: 0 1 auto', 'min-width: 0', 'max-width: 100%', 'padding: 0 0.3em']);
-  rule('.fm-name', ['font-weight: bold', 'font-size: 1.05em', 'color: ' + t.accent, 'word-wrap: break-word']);
-  rule('.fm-banner', ['margin: 0.25em auto 0', 'padding: 0.1em 0.5em', 'font-size: 0.72em', 'font-weight: bold',
+  rule('.fm-ident', ['display: block', 'flex: 0 1 auto', 'min-width: 0', 'max-width: 100%', 'padding: 0 0.3em']);
+  rule('.fm-name', ['display: block', 'font-weight: bold', 'font-size: 1.05em', 'color: ' + t.accent, 'word-wrap: break-word']);
+  rule('.fm-banner', ['display: block', 'margin: 0.25em auto 0', 'padding: 0.1em 0.5em', 'font-size: 0.72em', 'font-weight: bold',
     'line-height: 1.5', 'color: #ffffff', 'border-radius: 3px']);
   rule('.fm-main', ['display: flex', 'flex-direction: column', 'flex: 999 1 22em', 'min-width: 0', 'padding: 0.6em 0.9em']);
   rule('.fm-attr', ['display: flex', 'justify-content: space-between', 'padding-bottom: 0.4em', 'margin-bottom: 0.6em',
     'border-bottom: 1px solid ' + t.border, 'font-size: 0.8em', 'color: ' + t.muted]);
+  rule('.fm-num', ['margin-left: auto']);
+  rule('.fm-num:before', ['content: "#"']);
   rule('.fm-body', ['flex: 1 0 auto', 'word-wrap: break-word']);
-  rule('.fm-actions', ['margin-top: 0.6em', 'font-size: 0.75em', 'color: ' + t.muted, 'text-align: right']);
-  rule('.fm-actions span', ['margin-left: 1em']);
+  rule('.fm-actions', ['margin-top: 0.6em', 'font-size: 0.75em', 'color: ' + t.muted, 'text-align: right', 'word-spacing: 1em']);
+  rule('.fm-actions:before', ['content: "Report Like Quote Reply"']);
 
   BB_PALETTE.forEach(function (color, i) {
     rule('.fm-av' + i + ', .fm-bn' + i, ['background: ' + color]);
@@ -656,6 +821,17 @@ export function workSkinCss(themeName) {
   [0.65, 0.8, 1, 1.15, 1.4, 1.7, 2.1].forEach(function (size, i) {
     rule('.fm-size-' + (i + 1), ['font-size: ' + size + 'em']);
   });
+
+  // Glyphs: the characters glyphs() spells out with empty spans.
+  var glyphRule = function (cls, ch) {
+    rules.push('.' + cls + ':before { content: "' + ch + '"; }');
+  };
+  'abcdefghijklmnopqrstuvwxyz'.split('').forEach(function (ch) {
+    glyphRule('fm-g-' + ch, ch);
+    glyphRule('fm-g-u' + ch, ch.toUpperCase());
+  });
+  '0123456789'.split('').forEach(function (ch) { glyphRule('fm-g-' + ch, ch); });
+  Object.keys(GLYPH_PUNCT).forEach(function (ch) { glyphRule('fm-g-' + GLYPH_PUNCT[ch], ch); });
 
   return rules.join('\n\n') + '\n';
 }

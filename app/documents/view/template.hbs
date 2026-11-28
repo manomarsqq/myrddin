@@ -35,7 +35,37 @@
       <p style="text-align: center">■</p>
     {{/if}}
     {{#each model.threads as |thread|}}
-      {{#if model.settings.showOutput}}
+      {{#if thread.isPrivate}}
+        {{#if model.settings.showOutput}}
+          <p>
+            [b]♦  Private Message {{pm-headline thread model.user thread.outputSignature}}[/b]<br/>
+            [b]Subject:[/b] {{thread.name}}
+          </p>
+          <p>
+            [b]{{if thread.firstPost.user thread.firstPost.user.name "Placeholder_User"}}:[/b] {{html-output thread.firstPost.content}}
+          </p>
+          {{#each thread.posts as |post|}}
+            <p>
+              [b]{{if post.user post.user.name "Placeholder_User"}}:[/b] {{html-output post.content}}
+            </p>
+          {{/each}}
+          <p>[CENTER]■[/CENTER]</p>
+        {{else}}
+          <p>
+            <b>♦  Private Message {{pm-headline thread model.user thread.outputSignature}}</b><br/>
+            <b>Subject:</b> {{thread.name}}
+          </p>
+          <p>
+            <b>{{if thread.firstPost.user thread.firstPost.user.name "Placeholder_User"}}:</b> {{html-output thread.firstPost.content}}
+          </p>
+          {{#each thread.posts as |post|}}
+            <p>
+              <b>{{if post.user post.user.name "Placeholder_User"}}:</b> {{html-output post.content}}
+            </p>
+          {{/each}}
+          <p style="text-align: center">■</p>
+        {{/if}}
+      {{else if model.settings.showOutput}}
         <p>
           [b]♦  Topic: {{thread.name}}[/b]<br/>
           [b]In:  Boards ► {{thread.location}}[/b]<br/>
@@ -214,7 +244,7 @@
                     <a class="btn btn-default btn-sm {{if (eq-str model.avatarStyle style.key) 'active'}}" title={{style.label}} {{action "setDocOption" model "avatarStyle" style.key}}>{{style.name}}</a>
                   {{/each}}
                 </div>
-                <span class="help-block">Image avatars come from DiceBear (dicebear.com), loaded by whoever reads the post. On AO3, Initials and Text are drawn by the work skin and load nothing.</span>
+                <span class="help-block">Image avatars come from DiceBear (dicebear.com), loaded by whoever reads the post. On AO3 every style becomes an Initials-style letter drawn by the work skin, so nothing is loaded and the text stays clean when the skin is hidden.</span>
                 {{#if (eq-str model.outputFormat 'forum')}}
                   <span class="help-block">Forum BBCode can't set the forum's own colours. The theme only changes the preview, so pick the one closest to the board you post on.</span>
 
@@ -234,25 +264,29 @@
   {{#each model.threads as |thread|}}
     <div class="row">
       <div class="col-xs-12 col-sm-8 col-md-7 col-lg-6">
-        <div class="panel panel-default">
+        <div class="panel panel-default {{if thread.isPrivate 'panel-pm'}}">
           <div class="panel-heading">
             <div class="pull-right" style="padding-top: 5px;">
               {{confirm-delete-button
                 btnSize="btn-sm"
-                text="Delete this thread?"
+                text=(if thread.isPrivate "Delete this conversation?" "Delete this thread?")
                 action="deleteThread"
                 param=thread.id}}
             </div>
-            <h4>{{edit-interlude-title title=thread.name action="renameThread" param=thread.id}}</h4>
+            <h4>{{#if thread.isPrivate}}<span class="pm-icon" title="Private message conversation">{{fa-icon "envelope"}}</span> {{/if}}{{edit-interlude-title title=thread.name action="renameThread" param=thread.id}}</h4>
           </div>
 
           <div class="panel-body">
-            {{board-location
-              location=thread.location
-              thread=thread
-              saveChange='saveThreadLocation'}}<br/>
+            {{#if thread.isPrivate}}
+              <p class="help-block pm-help">A private message conversation. The title is its subject. It shows up in the output where it sits in this list.</p>
+            {{else}}
+              {{board-location
+                location=thread.location
+                thread=thread
+                saveChange='saveThreadLocation'}}<br/>
+            {{/if}}
 
-            <label>Original Poster</label>
+            <label>{{if thread.isPrivate "Started By" "Original Poster"}}</label>
 
             {{#interlude-user-picker
               givenUser= thread.firstPost.user
@@ -278,7 +312,7 @@
             {{/if}}
 
             <hr class="thin"/>
-            <label>Post Date</label>
+            <label>{{if thread.isPrivate "Sent On" "Post Date"}}</label>
             {{#post-date-picker}}
               {{pikaday-input
                 class="form-control"
@@ -289,12 +323,13 @@
             {{/post-date-picker}}
 
             <hr class="thin"/>
-            <label>Post Content</label>
+            <label>{{if thread.isPrivate "Message" "Post Content"}}</label>
             {{post-editor
               post=thread.firstPost
               postContent=thread.firstPost.content
               onChange="setPostConent"}}
 
+            {{#unless thread.isPrivate}}
             <hr class="thin"/>
             <div class="row">
               <div class="col-xs-6">
@@ -316,6 +351,7 @@
                   onChange="saveThreadEndPage"}}
               </div>
             </div>
+            {{/unless}}
           </div>
 
           {{#sortable-group tagName="ul" class="list-group" onChange="reorderItems" model=thread as |group|}}
@@ -324,13 +360,13 @@
                 <div class="pull-right">
                   {{confirm-delete-button
                     btnSize="btn-xs"
-                    text="Delete this post?"
+                    text=(if thread.isPrivate "Delete this message?" "Delete this post?")
                     action="deletePost"
                     param=post}}
                 </div>
 
                 <label >
-                  {{fa-icon "arrows" border=true classNames="handle"}} Responding User
+                  {{fa-icon "arrows" border=true classNames="handle"}} {{if thread.isPrivate "Reply From" "Responding User"}}
                 </label>
                 <hr class="thin"/>
 
@@ -369,7 +405,7 @@
                 {{/post-date-picker}}
 
                 <hr class="thin"/>
-                <label>Post Content</label>
+                <label>{{if thread.isPrivate "Message" "Post Content"}}</label>
                 {{post-editor
                   post=post
                   postContent=post.content
@@ -379,7 +415,7 @@
           {{/sortable-group}}
           <li class="list-group-item">
             <button class="btn btn-primary btn-xs" {{action "createPost" thread}}>
-              {{fa-icon "plus-square"}} Add New Post
+              {{fa-icon "plus-square"}} {{if thread.isPrivate "Add New Reply" "Add New Post"}}
             </button>
           </li>
         </div>
@@ -388,6 +424,9 @@
   {{/each}}
   <button class="btn btn-primary" {{action "createThread" model}}>
     {{fa-icon "plus-square"}} Add New Thread
+  </button>
+  <button class="btn btn-default" {{action "createThread" model "pm"}}>
+    {{fa-icon "envelope"}} Add Private Message
   </button>
 </div>
 

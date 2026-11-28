@@ -510,3 +510,21 @@ body.theme-dark {
   .is-selected .pika-button { background: $dk-accent; color: #0d1117; box-shadow: none; }
   .pika-prev, .pika-next { filter: invert(1); }
 }
+
+// Private message conversations in the editor.
+.panel-pm {
+  border-left: 4px solid #6aa6e8;
+
+  .pm-icon { color: #6aa6e8; }
+  .pm-help { margin-top: 0; }
+}
+
+.ao3-skin-toggle {
+  margin-bottom: 8px;
+  text-align: right;
+}
+
+.ao3-skin-toggle {
+  margin-bottom: 8px;
+  text-align: right;
+}

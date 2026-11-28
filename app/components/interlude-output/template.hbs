@@ -8,7 +8,7 @@
         <b>Step 1: Work skin</b>
         <div class="output-step-help">
           On AO3, go to Dashboard &rsaquo; Skins &rsaquo; My Work Skins &rsaquo; Create Work Skin and paste this as the CSS.
-          You only need to do this once per theme. Then, under Associations on the work's edit page, choose that skin as the Work Skin.
+          You only need to do this once per theme, and again after Myrddin updates the skin. Then, under Associations on the work's edit page, choose that skin as the Work Skin.
         </div>
       </div>
       <pre id="interludeWorkSkin" class="output-code output-code-short">{{workSkin}}</pre>
@@ -20,7 +20,7 @@
         </button>
         <b>Step 2: Chapter text</b>
         <div class="output-step-help">
-          Switch the chapter text box to <b>HTML</b> (not Rich Text) and paste this in.
+          Switch the chapter text box to <b>HTML</b> (not Rich Text) and paste this in. Readers who hide your style, and AO3's downloads, get the Classic PHO layout.
         </div>
       </div>
       <pre id="interludeTextContent" class="output-code">{{outputText}}</pre>
@@ -42,6 +42,11 @@
   {{/if}}
 {{else}}
   {{#if isAo3}}
+    <div class="ao3-skin-toggle">
+      <button type="button" class="btn btn-default btn-xs {{if hideSkin 'active'}}" title="AO3 readers can turn off work skins, and AO3's downloads leave them out. This is what they see." {{action 'toggleSkin'}}>
+        {{fa-icon (if hideSkin "check-square-o" "square-o")}} Hide creator's style
+      </button>
+    </div>
     <div class="ao3-preview">
       <div id="workskin">
         <div class="userstuff">{{previewHtml}}</div>

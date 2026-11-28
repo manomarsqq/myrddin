@@ -10,6 +10,8 @@ export default DS.Model.extend({
   endPage: DS.attr('number',{
     defaultValue: 1
   }),
+  // 'thread' for a forum thread, 'pm' for a private message conversation.
+  kind: DS.attr('string', { defaultValue: 'thread' }),
   doc: DS.belongsTo('document'),
   posts: DS.hasMany('post',{
     embedded: 'always',
@@ -31,14 +33,16 @@ export default DS.Model.extend({
     }
   }),
 
+  isPrivate: Ember.computed.equal('kind', 'pm'),
+
   // See user.outputSignature.
-  outputSignature: Ember.computed('name', 'location', 'startPage', 'endPage',
+  outputSignature: Ember.computed('name', 'kind', 'location', 'startPage', 'endPage',
       'firstPost.outputSignature', 'posts.@each.outputSignature', function() {
     var firstPost = this.get('firstPost');
     var posts = (this.get('posts') || []).map(function(post) {
       return post.get('outputSignature');
     });
-    return [this.get('name'), this.get('location'), this.get('startPage'), this.get('endPage'),
+    return [this.get('name'), this.get('kind'), this.get('location'), this.get('startPage'), this.get('endPage'),
       firstPost ? firstPost.get('outputSignature') : ''].concat(posts).join('|');
   }),
 });

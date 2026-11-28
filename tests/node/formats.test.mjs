@@ -3,7 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bbcodeToHtml, quoteAuthor } from '../../app/utils/bbcode.js';
 import {
-  forumBBCode, ao3Html, workSkinCss, xfPreviewCss, threadLayout, pageList, numToWord, THEMES, avatarUrl
+  forumBBCode, ao3Html, workSkinCss, xfPreviewCss, threadLayout, pageList, numToWord, THEMES, avatarUrl,
+  pmParticipants, pmHeadline, classicPageList, glyphs, avatarIndex
 } from '../../app/utils/forum-format.js';
 
 var bagrat = { id: '1', name: 'Bagrat', tags: [{ id: '1', name: 'Veteran Member' }, { id: '18', name: 'Moderator' }] };
@@ -190,9 +191,87 @@ test('AO3 html: no style attributes, no forbidden tags, balanced divs', function
   assert.doesNotMatch(html, /<(script|style|details|summary|iframe)/);
   assert.equal((html.match(/<div/g) || []).length, (html.match(/<\/div>/g) || []).length);
   assert.match(html, /&lt;b&gt;raw&lt;\/b&gt;/);
-  assert.match(html, /<span class="fm-num">#13<\/span>/);
-  assert.match(html, /fm-bn-mod">Moderator/);
-  assert.match(html, /fm-bn-op">Original Poster/);
+  assert.ok(html.includes('<span class="fm-num"><span class="fm-g-1"></span><span class="fm-g-3"></span></span>'));
+  assert.ok(html.includes('fm-bn-mod"><span class="fm-x">(</span>Moderator<span class="fm-x">)</span>'));
+  assert.ok(html.includes('fm-bn-op"><span class="fm-x">(</span>Original Poster<span class="fm-x">)</span>'));
+});
+
+// What a reader sees with "Hide Creator's Style" on: the text, one line per
+// block, with no CSS at all.
+function unstyledText(html) {
+  return html
+    .replace(/<br \/>/g, '\n')
+    .replace(/<\/?(div|p|blockquote)\b[^>]*>/g, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+    .split('\n')
+    .map(function (line) { return line.replace(/\s+/g, ' ').trim(); })
+    .filter(function (line) { return line; });
+}
+
+test('AO3 with the creator\'s style hidden reads exactly like Classic PHO', function () {
+  var snap = snapshot(3, { postsPerPage: 2 });
+  snap.threads[0].endPage = 2;
+  snap.threads[0].op.classicDate = 'Jan 1st 2011';
+  snap.threads[0].replies.forEach(function (post) { post.classicDate = 'Jan 2nd 2011'; });
+  snap.threads.push(conversation(bagrat, [tin]));
+  assert.deepEqual(unstyledText(ao3Html(snap, { bbToHtml: bbcodeToHtml })), [
+    '■',
+    'Welcome to the Parahumans Online message boards.',
+    'You are currently logged in, Tin_Mother',
+    'You are viewing:',
+    '• Threads you have replied to',
+    '• AND Threads that have new replies',
+    '• OR private message conversations with new replies',
+    '• Thread OP is displayed.',
+    '• Two posts per page',
+    '• Last ten messages in private message history.',
+    '• Threads and private messages are ordered chronologically.',
+    '■',
+    '♦ Topic: Endbringer Thread',
+    'In: Boards ► Places ► America ► Brockton Bay',
+    'Bagrat (Original Poster) (Veteran Member) (Moderator)',
+    'Posted On Jan 1st 2011:',
+    'First post',
+    'bold',
+    '(Showing page 1 of 2)',
+    '►Tin_Mother',
+    'Replied On Jan 2nd 2011:',
+    'Reply 1',
+    'End of Page. 1, 2',
+    '(Showing page 2 of 2)',
+    '►Bagrat (Original Poster) (Veteran Member) (Moderator)',
+    'Replied On Jan 2nd 2011:',
+    'Reply 2',
+    '►Tin_Mother',
+    'Replied On Jan 2nd 2011:',
+    'Reply 3',
+    'End of Page. 1, 2',
+    '■',
+    '♦ Private Message from Bagrat',
+    'Subject: About last night',
+    'Bagrat:',
+    'Hey.',
+    'Tin_Mother:',
+    'Message 2',
+    '■'
+  ]);
+});
+
+test('Classic page list, with the last page included', function () {
+  assert.deepEqual(classicPageList(1, 2), [1, 2]);
+  assert.deepEqual(classicPageList(2, 2), [1, 2]);
+  assert.deepEqual(classicPageList(10, 20), [1, 2, 3, '...', 8, 9, 10, 11, 12, '...', 18, 19, 20]);
+  assert.deepEqual(classicPageList(3, 4), [1, 2, 3, 4]);
+});
+
+test('glyphs spell text with empty spans the work skin fills in', function () {
+  assert.equal(glyphs('Ab 1'), '<span class="fm-g-ua"></span><span class="fm-g-b"></span><span class="fm-g-sp"></span><span class="fm-g-1"></span>');
+  assert.equal(glyphs('é'), '');
+  var css = workSkinCss('midnight');
+  ['fm-g-ua', 'fm-g-b', 'fm-g-sp', 'fm-g-1', 'fm-g-ap', 'fm-g-qm'].forEach(function (cls) {
+    assert.ok(css.includes('.' + cls + ':before { content: "'), cls);
+  });
 });
 
 test('AO3 html never puts a newline between inline elements', function () {
@@ -207,6 +286,10 @@ test('work skin CSS uses only AO3-friendly constructs', function () {
     var css = workSkinCss(name);
     assert.doesNotMatch(css, /@media|@import|var\(|url\(|position:|!important/);
     assert.match(css, /\.fm-post \{/);
+    // AO3 only keeps `content` when it's a single quoted string.
+    (css.match(/(?<![-\w])content:[^;]*;/g) || []).forEach(function (decl) {
+      assert.match(decl, /^content: "[^"]*";$/, decl);
+    });
     assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length);
   });
 });
@@ -252,9 +335,12 @@ test('parser: IMG width attribute and [HR][/HR]', function () {
   assert.equal(bbcodeToHtml('a[HR][/HR]b', 'xf'), 'a<hr class="bb-hr" />b');
 });
 
-test('AO3: image avatar styles use <img>, initials stay CSS', function () {
-  assert.match(ao3Html(snapshot(1), { avatars: 'thumbs' }), /<div class="fm-avatar fm-avatar-pic"><img src="https:\/\/api\.dicebear\.com\/9\.x\/thumbs\//);
-  assert.doesNotMatch(ao3Html(snapshot(1), { avatars: 'initials' }), /dicebear/);
+test('AO3: every avatar style is a CSS letter, so nothing shows when the skin is hidden', function () {
+  ['thumbs', 'identicon', 'initials', 'letter'].forEach(function (style) {
+    var html = ao3Html(snapshot(1), { avatars: style });
+    assert.doesNotMatch(html, /<img|dicebear/);
+    assert.ok(html.includes('<span class="fm-avatar fm-av' + avatarIndex('Bagrat') + '"><span class="fm-g-ub"></span></span>'));
+  });
 });
 
 test('every theme has every colour, and the preview CSS uses it', function () {
@@ -265,4 +351,78 @@ test('every theme has every colour, and the preview CSS uses it', function () {
     assert.deepEqual(Object.keys(THEMES[name]).sort(), keys.slice().sort(), name);
     assert.match(xfPreviewCss(name), new RegExp('background: ' + THEMES[name].page));
   });
+});
+
+// --- Private messages ------------------------------------------------------
+
+var weld = { id: '3', name: 'Weld', tags: [] };
+
+function conversation(op, replies) {
+  return {
+    name: 'About last night',
+    isPrivate: true,
+    location: 'ignored ► here',
+    startPage: 4,
+    endPage: 9,
+    op: { user: op, date: 'Feb 1, 2011', content: 'Hey.' },
+    replies: (replies || []).map(function (user, i) {
+      return { user: user, date: 'Feb 1, 2011', content: 'Message ' + (i + 2) };
+    })
+  };
+}
+
+test('PM participants: order of first message, then the inbox owner', function () {
+  var pm = conversation(bagrat, [weld, bagrat, weld]);
+  assert.deepEqual(pmParticipants(pm, tin).map(function (u) { return u.name; }), ['Bagrat', 'Weld', 'Tin_Mother']);
+  assert.deepEqual(pmParticipants(conversation(tin, [bagrat]), tin).map(function (u) { return u.name; }), ['Tin_Mother', 'Bagrat']);
+});
+
+test('PM headline: from the sender, or to everyone else when the inbox owner wrote first', function () {
+  assert.equal(pmHeadline(conversation(bagrat, [tin]), tin), 'from Bagrat');
+  assert.equal(pmHeadline(conversation(tin, [bagrat, weld]), tin), 'to Bagrat, Weld');
+  assert.equal(pmHeadline(conversation(tin, []), tin), 'from Tin_Mother');
+  assert.equal(pmHeadline(conversation(null, []), tin), 'from Placeholder_User');
+});
+
+test('forum BBCode: a conversation is one numbered table with no pages and no OP tag', function () {
+  var snap = snapshot(2);
+  snap.threads.push(conversation(bagrat, [tin, bagrat]));
+  var out = forumBBCode(snap);
+  var pmPart = out.substring(out.indexOf('Inbox'));
+  assert.ok(pmPart.includes('[HEADING=2]✉ About last night[/HEADING]'));
+  assert.ok(pmPart.includes('Private conversation started by Bagrat, Feb 1, 2011  ·  Participants: Bagrat, Tin_Mother'));
+  assert.equal(pmPart.split('[TABLE]').length - 1, 1);
+  assert.ok(pmPart.includes('#3['));
+  assert.doesNotMatch(pmPart, /Original Poster|Page \d+ of|ignored/);
+  // The thread before it still has its OP tag, and threads are split by HR.
+  assert.match(out.substring(0, out.indexOf('Inbox')), /Original Poster/);
+  assert.ok(out.includes('[HR][/HR]\n\n[SIZE=2][COLOR=#8c8c8c]Inbox'));
+});
+
+test('forum BBCode conversation stays balanced and renders', function () {
+  var snap = snapshot(0);
+  snap.threads = [conversation(tin, [bagrat])];
+  ['sidebar', 'stacked'].forEach(function (layout) {
+    var out = forumBBCode(snap, { layout: layout });
+    ['TABLE', 'TR', 'TD', 'TH', 'HEADING'].forEach(function (tag) {
+      var open = out.split('[' + tag + ']').length + out.split('[' + tag + '=').length - 2;
+      var close = out.split('[/' + tag + ']').length - 1;
+      assert.equal(open, close, layout + ' ' + tag);
+    });
+    assert.match(bbcodeToHtml(out, 'xf'), /<table class="bb-table">/);
+  });
+});
+
+test('AO3: a conversation gets its own block, with no banners, dates or pages', function () {
+  var snap = snapshot(1);
+  snap.threads.push(conversation(tin, [bagrat, weld]));
+  var html = ao3Html(snap, { bbToHtml: bbcodeToHtml });
+  var pmPart = html.substring(html.indexOf('fm-pm'));
+  assert.ok(pmPart.includes('<div class="fm-pmfrom"><strong><span class="fm-x">♦&nbsp; </span>Private Message to Bagrat, Weld</strong></div>'));
+  assert.ok(pmPart.includes('<div class="fm-title"><span class="fm-x"><strong>Subject:</strong> </span><span class="fm-pm-tag"></span>About last night</div>'));
+  assert.equal((pmPart.match(/class="fm-post"/g) || []).length, 3);
+  assert.doesNotMatch(pmPart, /fm-banner|fm-pagenav|fm-date|fm-replies/);
+  assert.doesNotMatch(html, /style=/);
+  assert.equal(html.split('<div').length, html.split('</div>').length);
+  assert.ok(workSkinCss('midnight').includes('.fm-pm .fm-post {'));
 });

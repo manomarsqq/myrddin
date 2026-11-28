@@ -1,5 +1,21 @@
 # Myrddin Changelog
 
+### Myrddin 0.5.0
+- Private message conversations: **Add Private Message** under the threads.
+  A conversation has a subject, a first message and replies, each with its own
+  sender and date. Classic PHO prints "♦ Private Message from …" (or "to …"
+  when the interlude user wrote first) with one line per message. Forum BBCode
+  and AO3 show it as an inbox conversation: subject, who started it, the
+  participants, and the messages in one block with no pages.
+- AO3 Forum output is now the Classic PHO transcript underneath. With *Hide
+  Creator's Style* on, or in AO3's downloads, it reads exactly like Classic
+  PHO; the work skin turns it into the forum. Paste the new work skin into AO3
+  again. On AO3, avatars are always coloured letters, dates use the Classic
+  format ("Apr 3rd 2011"), and the "Discussion in … started by …" line is gone.
+- The AO3 preview has a **Hide creator's style** button.
+- Classic PHO's "End of Page." list now includes the last page when you're on
+  the page before it (it used to stop one short).
+
 ### Myrddin 0.4.0
 - Forum BBCode reworked after a test post on a live XenForo forum: a shaded
   header bar on every post, image avatars, thread titles as `[HEADING]`, a
