@@ -719,7 +719,7 @@ export function workSkinCss(themeName) {
   rule('.fm-tab', ['padding: 0.45em 0.8em', 'font-size: 0.9em', 'color: ' + t.headerText]);
   rule('.fm-tab-on', ['background: ' + t.accent, 'color: ' + t.accentText, 'font-weight: bold']);
   rule('.fm-tab-forums:before', ['content: "Forums"']);
-  rule('.fm-tab-new:before', ['content: "What\'s new"']);
+  rule('.fm-tab-new:before', ['content: "What’s new"']);
   rule('.fm-tab-members:before', ['content: "Members"']);
 
   rule('.fm-notice', ['margin: 0.75em', 'padding: 0.6em 0.9em', 'background: ' + t.notice, 'border: 1px solid ' + t.border,
@@ -822,9 +822,14 @@ export function workSkinCss(themeName) {
     rule('.fm-size-' + (i + 1), ['font-size: ' + size + 'em']);
   });
 
-  // Glyphs: the characters glyphs() spells out with empty spans.
+  // Glyphs: the characters glyphs() spells out with empty spans. AO3 reads the
+  // skin with css_parser, which takes a lone "(" for the start of a url(...)
+  // and swallows the declaration, so brackets go in as CSS escapes: "\28"
+  // still shows as "(". So do the characters AO3 may HTML-escape on the way
+  // in (it turns "&gt;" back into ">"), and anything else that could trip it.
   var glyphRule = function (cls, ch) {
-    rules.push('.' + cls + ':before { content: "' + ch + '"; }');
+    var text = /[(){};"'&<>\\]/.test(ch) ? '\\' + ch.charCodeAt(0).toString(16) : ch;
+    rules.push('.' + cls + ':before { content: "' + text + '"; }');
   };
   'abcdefghijklmnopqrstuvwxyz'.split('').forEach(function (ch) {
     glyphRule('fm-g-' + ch, ch);

@@ -294,6 +294,26 @@ test('work skin CSS uses only AO3-friendly constructs', function () {
   });
 });
 
+test('work skin survives css_parser, which AO3 uses to read it', function () {
+  Object.keys(THEMES).forEach(function (name) {
+    var css = workSkinCss(name);
+    // css_parser splits a rule's body on ";" and treats a piece with a "(" but
+    // no ")" after it as an unfinished url(...), so the declaration vanishes
+    // and AO3 says "There don't seem to be any rules for ...".
+    (css.match(/\{[^}]*\}/g) || []).forEach(function (body) {
+      body.slice(1, -1).split(';').forEach(function (decl) {
+        var open = decl.indexOf('(');
+        assert.ok(open === -1 || decl.indexOf(')', open) !== -1, name + ': unmatched "(" in: ' + decl.trim());
+      });
+    });
+    assert.ok(css.includes('.fm-g-lp:before { content: "\\28"; }'));
+    assert.ok(css.includes('.fm-g-rp:before { content: "\\29"; }'));
+    assert.ok(css.includes('.fm-g-am:before { content: "\\26"; }'));
+    // Nothing AO3 might HTML-escape, inside or outside a string.
+    assert.doesNotMatch(css.replace(/ > /g, ' '), /[&<>']/);
+  });
+});
+
 // --- Forum BBCode polish (from a real XenForo test post) -------------------
 
 test('sidebar posts get a header bar with date and post number', function () {

@@ -1,5 +1,11 @@
 # Myrddin Changelog
 
+### Myrddin 0.5.1
+- Fix AO3 refusing to save the work skin ("There don't seem to be any rules
+  for .fm-g-lp:before"). AO3's CSS parser reads a lone "(" as the start of a
+  url(), so brackets and a few other characters in the skin are now written as
+  CSS escapes. Copy the work skin again and save it.
+
 ### Myrddin 0.5.0
 - Private message conversations: **Add Private Message** under the threads.
   A conversation has a subject, a first message and replies, each with its own
